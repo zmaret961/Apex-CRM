@@ -34,6 +34,7 @@ export default function MapView() {
   const [industry, setIndustry] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [minFit, setMinFit] = useState(0);
+  const [pipelineOnly, setPipelineOnly] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [mapRef, setMapRef] = useState<MapRef | null>(null);
   const [hovered, setHovered] = useState<Company | null>(null);
@@ -45,13 +46,14 @@ export default function MapView() {
     if (industry) p.set("industry", industry);
     if (status) p.set("status", status);
     if (minFit) p.set("minFit", String(minFit));
+    if (pipelineOnly) p.set("stage", "open");
     fetch(`/api/companies?${p}`)
       .then((r) => r.json())
       .then((list) => {
         setCompanies(list);
         setLoaded(true);
       });
-  }, [industry, status, minFit]);
+  }, [industry, status, minFit, pipelineOnly]);
 
   // Deep link: /?focus=<id> opens the company drawer and flies to its pin
   // (used by the ⌘K palette and Focus page). Re-runs when the URL changes,
@@ -225,6 +227,15 @@ export default function MapView() {
           <option value="researched">Researched</option>
           <option value="competitor">Competitors</option>
         </select>
+        <label className="interactive flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1 text-xs text-gray-300" title="Show only deals currently in the pipeline">
+          <input
+            type="checkbox"
+            checked={pipelineOnly}
+            onChange={(e) => setPipelineOnly(e.target.checked)}
+            className="accent-accent"
+          />
+          Pipeline only
+        </label>
         <label className="flex items-center gap-2 text-xs text-gray-400">
           Fit ≥ {minFit}
           <input
@@ -247,6 +258,7 @@ export default function MapView() {
               setIndustry("");
               setStatus("");
               setMinFit(0);
+              setPipelineOnly(false);
             }}
             className="ml-1.5 text-accent-soft hover:underline"
           >
