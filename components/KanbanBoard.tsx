@@ -16,10 +16,12 @@ import clsx from "clsx";
 import type { Company, PipelineStage } from "@/lib/types";
 import { PIPELINE_STAGES } from "@/lib/types";
 import StatusPill from "./StatusPill";
+import CompanyDrawer from "./CompanyDrawer";
 
 export default function KanbanBoard() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   async function load() {
@@ -67,17 +69,35 @@ export default function KanbanBoard() {
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
       <div className="flex gap-4 overflow-x-auto pb-4">
         {PIPELINE_STAGES.map((stage) => (
-          <Column key={stage} stage={stage} items={byStage.get(stage) ?? []} />
+          <Column
+            key={stage}
+            stage={stage}
+            items={byStage.get(stage) ?? []}
+            onSelect={setSelected}
+          />
         ))}
       </div>
       <DragOverlay>
         {active ? <Card company={active} overlay /> : null}
       </DragOverlay>
+      <CompanyDrawer
+        companyId={selected}
+        onClose={() => setSelected(null)}
+        onAdded={load}
+      />
     </DndContext>
   );
 }
 
-function Column({ stage, items }: { stage: PipelineStage; items: Company[] }) {
+function Column({
+  stage,
+  items,
+  onSelect,
+}: {
+  stage: PipelineStage;
+  items: Company[];
+  onSelect: (id: number) => void;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const closed = stage.startsWith("Closed");
   return (
@@ -105,7 +125,7 @@ function Column({ stage, items }: { stage: PipelineStage; items: Company[] }) {
       </div>
       <div className="space-y-2.5">
         {items.map((c) => (
-          <DraggableCard key={c.id} company={c} />
+          <DraggableCard key={c.id} company={c} onSelect={onSelect} />
         ))}
         {items.length === 0 && (
           <div className="rounded-xl border border-dashed border-white/10 p-4 text-center text-xs text-gray-600">
@@ -117,7 +137,13 @@ function Column({ stage, items }: { stage: PipelineStage; items: Company[] }) {
   );
 }
 
-function DraggableCard({ company }: { company: Company }) {
+function DraggableCard({
+  company,
+  onSelect,
+}: {
+  company: Company;
+  onSelect: (id: number) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: company.id,
   });
@@ -126,6 +152,7 @@ function DraggableCard({ company }: { company: Company }) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      onClick={() => !isDragging && onSelect(company.id)}
       style={{
         transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
         opacity: isDragging ? 0.4 : 1,

@@ -20,6 +20,8 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
   const [briefs, setBriefs] = useState(initialBriefs);
   const [openId, setOpenId] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
+  const [category, setCategory] = useState("");
+  const [q, setQ] = useState("");
 
   // Poll so new briefs appear while a sweep is running
   useEffect(() => {
@@ -29,9 +31,39 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
     return () => clearInterval(t);
   }, []);
 
+  const categories = [...new Set(briefs.flatMap((b) => b.claims.map((c) => c.category)))];
+  const filtered = briefs.filter(
+    (b) =>
+      (!category || b.claims.some((c) => c.category === category)) &&
+      (!q || (b.companyName ?? "").toLowerCase().includes(q.toLowerCase()))
+  );
+
   return (
     <div className="space-y-4">
-      {briefs.map((b) => {
+      <div className="glass flex flex-wrap items-center gap-2 rounded-2xl px-4 py-2.5">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Filter by company…"
+          className="interactive w-48 rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-sm outline-none placeholder:text-gray-600 focus:border-accent/50"
+        />
+        {categories.map((c) => (
+          <button
+            key={c}
+            onClick={() => setCategory(category === c ? "" : c)}
+            className={clsx(
+              "interactive rounded-full border px-3 py-1 text-xs",
+              category === c
+                ? "border-accent/50 bg-accent/15 text-white"
+                : "border-white/10 text-gray-400 hover:text-gray-200"
+            )}
+          >
+            {c}
+          </button>
+        ))}
+        <span className="ml-auto text-xs text-gray-500">{filtered.length} briefs</span>
+      </div>
+      {filtered.map((b) => {
         const open = openId === b.id;
         return (
           <article key={b.id} className="glass animate-fade-up rounded-2xl p-5">
@@ -91,9 +123,11 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
           </article>
         );
       })}
-      {briefs.length === 0 && (
+      {filtered.length === 0 && (
         <div className="glass rounded-2xl p-12 text-center text-sm text-gray-500">
-          No research yet — run a sweep from the Automation console.
+          {briefs.length === 0
+            ? "No research yet — run a sweep from the Automation console."
+            : "No briefs match these filters."}
         </div>
       )}
       <CompanyDrawer companyId={selected} onClose={() => setSelected(null)} />

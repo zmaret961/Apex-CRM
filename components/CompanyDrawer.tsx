@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Company, CompanyEvent, ResearchBrief } from "@/lib/types";
+import type { Company, CompanyEvent, PipelineStage, ResearchBrief } from "@/lib/types";
+import { PIPELINE_STAGES } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import FitScore from "./FitScore";
 
@@ -293,6 +294,14 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 ? "Adding…"
                 : "Add to Opportunities"}
             </button>
+            {company.pipelineStage != null && nextStage(company.pipelineStage) && (
+              <button
+                onClick={() => patch({ pipelineStage: nextStage(company.pipelineStage!) })}
+                className="interactive -mt-3 w-full rounded-xl border border-emerald-400/30 bg-emerald-400/10 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-400/20"
+              >
+                Advance → {nextStage(company.pipelineStage)}
+              </button>
+            )}
             {company.pipelineStage != null && (
               <button
                 onClick={removeFromPipeline}
@@ -306,6 +315,12 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
       </aside>
     </>
   );
+}
+
+function nextStage(stage: PipelineStage): PipelineStage | null {
+  const i = PIPELINE_STAGES.indexOf(stage);
+  if (i < 0 || stage === "Closed Won" || stage === "Closed Lost") return null;
+  return PIPELINE_STAGES[i + 1];
 }
 
 function hostname(url: string): string {

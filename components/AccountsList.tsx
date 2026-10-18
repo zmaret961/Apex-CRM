@@ -17,6 +17,7 @@ export default function AccountsList() {
   const [q, setQ] = useState("");
   const [industry, setIndustry] = useState("");
   const [status, setStatus] = useState("");
+  const [sort, setSort] = useState<"fit" | "name" | "employees">("fit");
   const [selected, setSelected] = useState<number | null>(null);
 
   // Deep link: /accounts?open=<id> opens the shared company drawer.
@@ -31,10 +32,16 @@ export default function AccountsList() {
       if (q) p.set("q", q);
       if (industry) p.set("industry", industry);
       if (status) p.set("status", status);
-      fetch(`/api/companies?${p}`).then((r) => r.json()).then(setCompanies);
+      fetch(`/api/companies?${p}`)
+        .then((r) => r.json())
+        .then((list: Company[]) => {
+          if (sort === "name") list.sort((a, b) => a.name.localeCompare(b.name));
+          else if (sort === "employees") list.sort((a, b) => b.employees - a.employees);
+          setCompanies(list);
+        });
     }, 180);
     return () => clearTimeout(t);
-  }, [q, industry, status]);
+  }, [q, industry, status, sort]);
 
   return (
     <>
@@ -62,6 +69,16 @@ export default function AccountsList() {
           <option value="customer">Customers</option>
           <option value="prospect">Prospects</option>
           <option value="researched">Researched</option>
+        </select>
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as typeof sort)}
+          className="interactive rounded-lg border border-white/10 bg-transparent px-2 py-1.5 text-sm text-gray-300 [&>option]:bg-base-900"
+          aria-label="Sort"
+        >
+          <option value="fit">Sort: fit score</option>
+          <option value="name">Sort: name</option>
+          <option value="employees">Sort: size</option>
         </select>
         <span className="ml-auto text-xs text-gray-500">{companies.length} accounts</span>
       </div>
