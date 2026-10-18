@@ -443,7 +443,11 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
               className="interactive w-full rounded-xl border border-accent/40 bg-accent/15 py-2.5 text-sm font-medium text-accent-soft hover:bg-accent/25 disabled:cursor-default disabled:border-emerald-400/30 disabled:bg-emerald-400/10 disabled:text-emerald-300"
             >
               {company.pipelineStage != null
-                ? `In pipeline — ${company.pipelineStage}`
+                ? `In pipeline — ${company.pipelineStage}${
+                    company.stageChangedAt
+                      ? ` · ${Math.max(0, Math.floor((Date.now() - new Date(company.stageChangedAt + "Z").getTime()) / 86400000))}d`
+                      : ""
+                  }`
                 : added
                 ? "✓ Added to Opportunities"
                 : adding

@@ -256,6 +256,7 @@ export default function MapView() {
         <Legend color="#34d399" label="Devin customer" />
         <Legend color="#60a5fa" label="High-fit prospect" />
         <Legend color="#6b7280" label="Researched / low-fit" />
+        <Legend color="#fb7185" label="Competitor (intel only)" />
       </div>
 
       <CompanyDrawer

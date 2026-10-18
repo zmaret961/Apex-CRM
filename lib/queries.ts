@@ -72,7 +72,14 @@ export function listCompanies(opts: {
 
 export function getCompany(id: number): Company | null {
   const db = getDb();
-  const row = db.prepare("SELECT * FROM companies WHERE id = ?").get(id) as RawCompany | undefined;
+  const row = db
+    .prepare(
+      `SELECT c.*,
+         (SELECT MAX(ce.ts) FROM company_events ce
+           WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt
+       FROM companies c WHERE c.id = ?`
+    )
+    .get(id) as RawCompany | undefined;
   return row ? hydrate(row) : null;
 }
 
