@@ -87,6 +87,11 @@ export default function AccountsList() {
         <span className="ml-auto text-xs text-gray-500">{companies.length} accounts</span>
       </div>
 
+      {companies.length === 0 && (
+        <div className="glass rounded-2xl p-12 text-center text-sm text-gray-500">
+          No accounts match these filters.
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {companies.map((c) => (
           <button
