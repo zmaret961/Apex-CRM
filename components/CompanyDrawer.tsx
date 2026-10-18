@@ -39,6 +39,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [copied, setCopied] = useState(false);
   const [suggestion, setSuggestion] = useState<FocusItem | null>(null);
   const [acting, setActing] = useState(false);
+  const [editingValue, setEditingValue] = useState(false);
+  const [valueDraft, setValueDraft] = useState("");
 
   useEffect(() => {
     if (companyId == null) {
@@ -242,11 +244,45 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
               <Row label="Employees" value={company.employees.toLocaleString()} />
               <Row label="Industry" value={company.industry} />
               <Row label="Funding" value={company.funding} />
-              <Row
-                label="Deal value"
-                value={company.estimatedValue ?? "unconfirmed"}
-                valueClass={company.estimatedValue ? "text-emerald-300" : "text-gray-500"}
-              />
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-gray-500">Deal value</span>
+                {editingValue ? (
+                  <input
+                    autoFocus
+                    value={valueDraft}
+                    onChange={(e) => setValueDraft(e.target.value)}
+                    onKeyDown={async (e) => {
+                      if (e.key === "Enter") {
+                        const v = valueDraft.trim();
+                        await patch({ estimatedValue: v === "" ? null : v });
+                        setEditingValue(false);
+                      } else if (e.key === "Escape") {
+                        setEditingValue(false);
+                      }
+                    }}
+                    onBlur={async () => {
+                      const v = valueDraft.trim();
+                      await patch({ estimatedValue: v === "" ? null : v });
+                      setEditingValue(false);
+                    }}
+                    placeholder="e.g. $120k est."
+                    className="w-40 rounded-md border border-accent/40 bg-transparent px-2 py-0.5 text-right text-sm text-white outline-none placeholder:text-gray-600"
+                  />
+                ) : (
+                  <button
+                    onClick={() => {
+                      setValueDraft(company.estimatedValue ?? "");
+                      setEditingValue(true);
+                    }}
+                    title="Click to set a deal estimate"
+                    className={`interactive rounded px-1 text-right ${
+                      company.estimatedValue ? "text-emerald-300" : "text-gray-500 hover:text-gray-300"
+                    }`}
+                  >
+                    {company.estimatedValue ?? "unconfirmed — click to set"}
+                  </button>
+                )}
+              </div>
               <Row
                 label="Last research"
                 value={

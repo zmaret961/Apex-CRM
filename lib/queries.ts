@@ -29,6 +29,7 @@ export function listCompanies(opts: {
   status?: string;
   minFit?: number;
   discovered?: boolean;
+  stage?: string;
 }): Company[] {
   const db = getDb();
   const where: string[] = ["c.discovered = ?"];
@@ -49,6 +50,14 @@ export function listCompanies(opts: {
   if (opts.minFit != null) {
     where.push("c.fitScore >= ?");
     args.push(opts.minFit);
+  }
+  if (opts.stage === "open") {
+    where.push("c.pipelineStage IS NOT NULL AND c.pipelineStage NOT IN ('Closed Won','Closed Lost')");
+  } else if (opts.stage === "none") {
+    where.push("c.pipelineStage IS NULL");
+  } else if (opts.stage) {
+    where.push("c.pipelineStage = ?");
+    args.push(opts.stage);
   }
   const rows = db
     .prepare(
@@ -107,6 +116,14 @@ export function markResearched(id: number) {
   db.prepare(
     "UPDATE companies SET lastResearchAt = datetime('now'), updatedAt = datetime('now') WHERE id = ?"
   ).run(id);
+}
+
+export function setEstimatedValue(id: number, value: string | null) {
+  const db = getDb();
+  db.prepare(
+    "UPDATE companies SET estimatedValue = ?, updatedAt = datetime('now') WHERE id = ?"
+  ).run(value, id);
+  addEvent(id, "note", value ? `Deal value set to ${value}` : "Deal value cleared");
 }
 
 export function setStatus(id: number, status: CompanyStatus) {

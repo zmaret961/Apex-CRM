@@ -8,6 +8,7 @@ import {
   isPipelineStage,
   updatePipeline,
   setStatus,
+  setEstimatedValue,
 } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "invalid status" }, { status: 400 });
     }
     setStatus(companyId, body.status);
+  }
+  if ("estimatedValue" in body) {
+    const v = body.estimatedValue;
+    if (v !== null && (typeof v !== "string" || v.trim().length === 0 || v.length > 120)) {
+      return NextResponse.json(
+        { error: "estimatedValue must be a string under 120 chars or null" },
+        { status: 400 }
+      );
+    }
+    setEstimatedValue(companyId, v === null ? null : v.trim());
   }
   if ("note" in body) {
     const note = String(body.note ?? "").trim();

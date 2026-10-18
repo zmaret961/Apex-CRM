@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import type { Company } from "@/lib/types";
+import { PIPELINE_STAGES, type Company } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import FitScore from "./FitScore";
 import CompanyDrawer from "./CompanyDrawer";
@@ -19,6 +19,7 @@ export default function AccountsList() {
   const [q, setQ] = useState("");
   const [industry, setIndustry] = useState("");
   const [status, setStatus] = useState("");
+  const [stage, setStage] = useState("");
   const [sort, setSort] = useState<"fit" | "name" | "employees">("fit");
   const [selected, setSelected] = useState<number | null>(null);
 
@@ -35,6 +36,7 @@ export default function AccountsList() {
       if (q) p.set("q", q);
       if (industry) p.set("industry", industry);
       if (status) p.set("status", status);
+      if (stage) p.set("stage", stage);
       fetch(`/api/companies?${p}`)
         .then((r) => r.json())
         .then((list: Company[]) => {
@@ -45,7 +47,7 @@ export default function AccountsList() {
         });
     }, 180);
     return () => clearTimeout(t);
-  }, [q, industry, status, sort]);
+  }, [q, industry, status, stage, sort]);
 
   function exportCsv() {
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
@@ -96,6 +98,17 @@ export default function AccountsList() {
           <option value="prospect">Prospects</option>
           <option value="researched">Researched</option>
           <option value="competitor">Competitors</option>
+        </select>
+        <select
+          value={stage}
+          onChange={(e) => setStage(e.target.value)}
+          aria-label="Filter by pipeline stage"
+          className="interactive rounded-lg border border-white/10 bg-transparent px-2 py-1.5 text-sm text-gray-300 [&>option]:bg-base-900"
+        >
+          <option value="">All stages</option>
+          <option value="open">In pipeline (open)</option>
+          <option value="none">Not in pipeline</option>
+          {PIPELINE_STAGES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         <select
           value={sort}

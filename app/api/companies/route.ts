@@ -11,6 +11,7 @@ export function GET(req: NextRequest) {
     status: p.get("status") ?? undefined,
     minFit: p.get("minFit") ? Number(p.get("minFit")) : undefined,
     discovered: p.get("discovered") === "1",
+    stage: p.get("stage") ?? undefined,
   });
   return NextResponse.json(companies);
 }
