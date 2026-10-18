@@ -77,6 +77,12 @@ See `AGENTS.md` for the full rules.
 - **Focus** opens with a pipeline-at-a-glance strip; suggestions can be
   **snoozed 7 days** and restored inline.
 - **Accounts** exports the current filtered view to CSV in one click.
+- **Focus** also keeps competitors fresh: stale rival research raises a
+  "Refresh competitor intel" item.
+- The drawer's **deal value is editable** — click "unconfirmed" and type an
+  estimate; it logs to the timeline.
+- **Accounts** filters by any pipeline stage, open pipeline, or
+  not-in-pipeline.
 
 ## Notes
 

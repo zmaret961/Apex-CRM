@@ -3117,7 +3117,7 @@ export const COMPANIES: SeedCompany[] = [
 
 // Enterprise-scale companies that the Automation Console can import via
 // "Import discovered accounts" — models the auto-import requirement.
-export const DISCOVERED_COMPANIES: SeedCompany[] = [
+const DISCOVERED_COMPANIES_V1: SeedCompany[] = [
   {
     name: "Wiz",
     domain: "wiz.io",
@@ -3522,6 +3522,115 @@ export const DISCOVERED_COMPANIES: SeedCompany[] = [
     signals: [{ text: "Alternatives platforms + AI initiatives publicly discussed.", source: "https://www.brookfield.com/news-insights" }],
     discovered: 1,
   },
+];
+
+// Second discovered batch — joins the auto-import queue via the
+// user_version=3 data migration (or a fresh seed).
+export const DISCOVERED_COMPANIES_V2: SeedCompany[] = [
+  {
+    name: "BNP Paribas (NYC)", domain: "bnpparibas.com", industry: "Finance",
+    address: "787 Seventh Avenue, New York, NY", lat: 40.7638, lng: -73.9820,
+    employees: 3000, funding: "Public (EPA: BNP)", status: "prospect", fitScore: 84,
+    description: "European bank with its US flagship at 787 Seventh Ave and a large NYC tech org.",
+    sources: ["https://usa.bnpparibas/en/"],
+    signals: [{ text: "US tech org spans markets platforms + internal tooling in NYC.", source: "https://usa.bnpparibas/en/careers/" }],
+    discovered: 1,
+  },
+  {
+    name: "HSBC (US)", domain: "us.hsbc.com", industry: "Finance",
+    address: "452 Fifth Avenue, New York, NY", lat: 40.7517, lng: -73.9833,
+    employees: 5000, funding: "Public (LSE: HSBA)", status: "prospect", fitScore: 82,
+    description: "HSBC's US headquarters on Fifth Ave; global bank with large NYC engineering.",
+    sources: ["https://www.us.hsbc.com/"],
+    signals: [{ text: "Public digital-transformation hiring across US technology.", source: "https://www.hsbc.com/careers" }],
+    discovered: 1,
+  },
+  {
+    name: "Nomura (Americas)", domain: "nomura.com", industry: "Finance",
+    address: "309 West 49th Street, New York, NY", lat: 40.7620, lng: -73.9860,
+    employees: 2200, funding: "Public (TYO: 8604)", status: "prospect", fitScore: 80,
+    description: "Japanese bank's Americas HQ at Worldwide Plaza; markets-tech teams on site.",
+    sources: ["https://www.nomura.com/americas/"],
+    signals: [{ text: "Americas technology org recruits trading-platform engineers in NYC.", source: "https://www.nomura.com/careers/" }],
+    discovered: 1,
+  },
+  {
+    name: "Macquarie (NYC)", domain: "macquarie.com", industry: "Finance",
+    address: "660 Fifth Avenue, New York, NY", lat: 40.7610, lng: -73.9760,
+    employees: 2000, funding: "Public (ASX: MQG)", status: "prospect", fitScore: 78,
+    description: "Australian financial group's US HQ; commodities + markets engineering in NYC.",
+    sources: ["https://www.macquarie.com"],
+    signals: [{ text: "NYC tech roles across risk, trading and data platforms.", source: "https://www.macquarie.com/au/en/careers.html" }],
+    discovered: 1,
+  },
+  {
+    name: "Hudson River Trading", domain: "hudsonrivertrading.com", industry: "Finance",
+    address: "3 World Trade Center, New York, NY", lat: 40.7123, lng: -74.0119,
+    employees: 1200, funding: "Private partnership", status: "prospect", fitScore: 92,
+    description: "Algorithmic trading firm HQ'd at 3 WTC; massive low-latency research engineering.",
+    sources: ["https://www.hudsonrivertrading.com"],
+    signals: [{ text: "Public engineering posts on FPGA/low-latency infra; NYC HQ.", source: "https://www.hudsonrivertrading.com/careers/" }],
+    discovered: 1,
+  },
+  {
+    name: "Mount Sinai Health System", domain: "mountsinai.org", industry: "Healthcare",
+    address: "1 Gustave L. Levy Place, New York, NY", lat: 40.7900, lng: -73.9527,
+    employees: 42000, funding: "Nonprofit", status: "prospect", fitScore: 70,
+    description: "Eight-hospital NYC health system with a growing digital-health eng org.",
+    sources: ["https://www.mountsinai.org"],
+    signals: [{ text: "MSDI (data/AI institute) recruits software + ML engineers.", source: "https://icahn.mssm.edu" }],
+    discovered: 1,
+  },
+  {
+    name: "NYU Langone Health", domain: "nyulangone.org", industry: "Healthcare",
+    address: "550 First Avenue, New York, NY", lat: 40.7424, lng: -73.9738,
+    employees: 50000, funding: "Nonprofit", status: "prospect", fitScore: 70,
+    description: "Top-ranked NYC health system; large Epic-adjacent + digital engineering teams.",
+    sources: ["https://nyulangone.org"],
+    signals: [{ text: "Continuous digital-health hiring across First Ave campus.", source: "https://nyulangone.org/careers" }],
+    discovered: 1,
+  },
+  {
+    name: "McKinsey & Company (NYC)", domain: "mckinsey.com", industry: "Consulting",
+    address: "3 World Trade Center, New York, NY", lat: 40.7110, lng: -74.0120,
+    employees: 45000, funding: "Private partnership", status: "prospect", fitScore: 78,
+    description: "Global consultancy's flagship office at 3 WTC; QuantumBlack AI engineering.",
+    sources: ["https://www.mckinsey.com"],
+    signals: [{ text: "QuantumBlack + internal platform teams build production AI tooling.", source: "https://www.mckinsey.com/careers" }],
+    discovered: 1,
+  },
+  {
+    name: "Boston Consulting Group (NYC)", domain: "bcg.com", industry: "Consulting",
+    address: "10 Hudson Yards, New York, NY", lat: 40.7527, lng: -74.0012,
+    employees: 30000, funding: "Private partnership", status: "prospect", fitScore: 78,
+    description: "BCG's NYC hub at Hudson Yards; BCG X builds custom software for clients.",
+    sources: ["https://www.bcg.com"],
+    signals: [{ text: "BCG X recruits full-stack + AI engineers in NYC.", source: "https://careers.bcg.com" }],
+    discovered: 1,
+  },
+  {
+    name: "Tapestry", domain: "tapestry.com", industry: "Retail",
+    address: "10 Hudson Yards, New York, NY", lat: 40.7530, lng: -74.0010,
+    employees: 18000, funding: "Public (NYSE: TPR)", status: "prospect", fitScore: 66,
+    description: "Coach/kate spade parent HQ'd at Hudson Yards; e-commerce platform engineering.",
+    sources: ["https://www.tapestry.com"],
+    signals: [{ text: "Digital-commerce engineering roles based in NYC HQ.", source: "https://www.tapestry.com/careers" }],
+    discovered: 1,
+  },
+  {
+    name: "Ralph Lauren", domain: "ralphlauren.com", industry: "Retail",
+    address: "650 Madison Avenue, New York, NY", lat: 40.7640, lng: -73.9700,
+    employees: 23000, funding: "Public (NYSE: RL)", status: "prospect", fitScore: 64,
+    description: "Global luxury brand HQ'd on Madison Ave with in-house digital engineering.",
+    sources: ["https://corporate.ralphlauren.com"],
+    signals: [{ text: "Public digital-transformation investment; NYC tech hiring.", source: "https://corporate.ralphlauren.com/careers.html" }],
+    discovered: 1,
+  },
+];
+
+export const DISCOVERED_COMPANIES: SeedCompany[] = [
+  ...DISCOVERED_COMPANIES_V1,
+  ...DISCOVERED_COMPANIES_V2,
 ];
 
 export interface SeedBrief {

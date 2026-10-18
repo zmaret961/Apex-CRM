@@ -1,7 +1,12 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
-import { COMPANIES, DISCOVERED_COMPANIES, SEED_BRIEFS } from "../data/dataset";
+import {
+  COMPANIES,
+  DISCOVERED_COMPANIES,
+  DISCOVERED_COMPANIES_V2,
+  SEED_BRIEFS,
+} from "../data/dataset";
 
 const DB_PATH = path.join(process.cwd(), "data", "apex.db");
 
@@ -153,5 +158,24 @@ function applyDataMigrations(db: Database.Database) {
     });
     tx();
     db.pragma("user_version = 2");
+  }
+  if (v < 3) {
+    // Batch 2 of the auto-import queue for databases already at v2.
+    const insert = db.prepare(
+      `INSERT INTO companies (name, domain, industry, address, lat, lng, employees, funding, status, fitScore, pipelineStage, estimatedValue, lastResearchAt, description, sources, signals, discovered)
+       SELECT @name, @domain, @industry, @address, @lat, @lng, @employees, @funding, @status, @fitScore, NULL, NULL, NULL, @description, @sources, @signals, 1
+       WHERE NOT EXISTS (SELECT 1 FROM companies WHERE domain = @domain)`
+    );
+    const tx = db.transaction(() => {
+      for (const c of DISCOVERED_COMPANIES_V2) {
+        insert.run({
+          ...c,
+          sources: JSON.stringify(c.sources ?? []),
+          signals: JSON.stringify(c.signals ?? []),
+        });
+      }
+    });
+    tx();
+    db.pragma("user_version = 3");
   }
 }
