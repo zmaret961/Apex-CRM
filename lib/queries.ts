@@ -132,7 +132,8 @@ export function listBriefs(limit = 50): ResearchBrief[] {
   const db = getDb();
   const briefs = db
     .prepare(
-      `SELECT rb.*, c.name as companyName, c.status as companyStatus
+      `SELECT rb.*, c.name as companyName, c.status as companyStatus,
+        c.pipelineStage as companyPipelineStage
        FROM research_briefs rb JOIN companies c ON c.id = rb.companyId
        ORDER BY rb.createdAt DESC LIMIT ?`
     )

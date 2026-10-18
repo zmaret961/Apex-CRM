@@ -22,6 +22,7 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
   const [selected, setSelected] = useState<number | null>(null);
   const [category, setCategory] = useState("");
   const [q, setQ] = useState("");
+  const [promoting, setPromoting] = useState<number | null>(null);
 
   // Poll so new briefs appear while a sweep is running
   useEffect(() => {
@@ -31,6 +32,19 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
     }, 3000);
     return () => clearInterval(t);
   }, []);
+
+  async function promote(b: ResearchBrief) {
+    setPromoting(b.companyId);
+    await fetch(`/api/companies/${b.companyId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pipelineStage: "Researched" }),
+    });
+    setBriefs((prev) =>
+      prev.map((x) => (x.companyId === b.companyId ? { ...x, companyPipelineStage: "Researched" } : x))
+    );
+    setPromoting(null);
+  }
 
   const categories = [...new Set(briefs.flatMap((b) => b.claims.map((c) => c.category)))];
   const filtered = briefs.filter(
@@ -83,12 +97,27 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
                   )}
                 </div>
               </div>
-              <button
-                onClick={() => setOpenId(open ? null : b.id)}
-                className="interactive rounded-lg border border-white/10 px-3 py-1 text-xs text-gray-400 hover:text-white"
-              >
-                {open ? "Collapse" : `${b.claims.length} claims ▾`}
-              </button>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <button
+                  onClick={() => setOpenId(open ? null : b.id)}
+                  className="interactive rounded-lg border border-white/10 px-3 py-1 text-xs text-gray-400 hover:text-white"
+                >
+                  {open ? "Collapse" : `${b.claims.length} claims ▾`}
+                </button>
+                {b.companyPipelineStage ? (
+                  <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-gray-400">
+                    {b.companyPipelineStage}
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => promote(b)}
+                    disabled={promoting === b.companyId}
+                    className="interactive rounded-lg border border-accent/40 bg-accent/15 px-3 py-1 text-xs font-medium text-accent-soft hover:bg-accent/25 disabled:opacity-40"
+                  >
+                    {promoting === b.companyId ? "…" : "Add to pipeline"}
+                  </button>
+                )}
+              </div>
             </div>
             <p className="mt-3 text-sm leading-relaxed text-gray-300">{b.whatTheyDo}</p>
             <div className="mt-3 rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm leading-relaxed text-gray-200">

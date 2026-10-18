@@ -51,6 +51,7 @@ export interface ResearchBrief {
   companyId: number;
   companyName?: string;
   companyStatus?: CompanyStatus;
+  companyPipelineStage?: PipelineStage | null;
   createdAt: string;
   whatTheyDo: string;
   whyNow: string;

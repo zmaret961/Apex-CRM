@@ -30,7 +30,11 @@ required — the map uses the free CARTO dark basemap.
    live log as briefs get written (e.g. Datadog, Two Sigma). The new briefs
    appear live on the **Research** page.
 5. On Automation, hit **Import discovered enterprises** to pull the queued
-   enterprise set (Wiz, Axonius, Palantir, Cloudflare…) into Accounts.
+   enterprise set (Wiz, Axonius, Palantir, Cloudflare…) into Accounts — the
+   queue preview lists who you're about to import.
+   Then open **Research**: each brief card can be promoted to the pipeline in
+   one click, and the drawer's **Copy brief** button hands you a markdown
+   outreach brief for the account.
 6. Press **⌘K**, type a company name, hit Enter — the map flies to its pin
    and opens the drawer. Then open **Focus** and clear the suggested actions
    with one click each.
@@ -42,8 +46,8 @@ required — the map uses the free CARTO dark basemap.
 | `/` | Full-viewport map, clustered glowing pins, live filters, company drawer. Deep link: `/?focus=<id>` flies to a pin and opens its drawer |
 | `/focus` | Next-best-action queue: Apex tells you what to do next — refresh stale research, advance ready deals, research top-fit accounts. Includes the competitive-surface rollup |
 | `/accounts` | Searchable card list of every account. Deep link: `/accounts?open=<id>` |
-| `/opportunities` | Kanban: Identified → Researched → Engaged → Demo Scheduled → Proposal → Closed Won/Lost |
-| `/research` | Feed of agent briefs; every claim cites a source |
+| `/opportunities` | Kanban: Identified → Researched → Engaged → Demo Scheduled → Proposal → Closed Won/Lost. Cards show days-in-stage; click for the drawer, or advance a stage from the drawer |
+| `/research` | Feed of agent briefs; every claim cites a source. Filter by company/category; one-click promote to pipeline |
 | `/automation` | Agent console: run sweeps, import discovered enterprises, live activity log |
 
 ## Data honesty
@@ -63,6 +67,10 @@ See `AGENTS.md` for the full rules.
 - The company drawer has a per-account **activity timeline** (pipeline moves,
   research runs, imports) and **notes** — pipeline moves are auto-logged, so
   the board stays honest with zero data entry.
+- **Copy brief** in the drawer copies a markdown outreach brief (fit, signals,
+  why-now, cited evidence) straight into your clipboard.
+- Kanban cards show **days in stage** (from the event log), and the drawer can
+  advance or remove a deal without leaving the page.
 
 ## Notes
 

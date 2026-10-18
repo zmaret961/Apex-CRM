@@ -67,6 +67,16 @@ export default function KanbanBoard() {
 
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <div className="mb-4 flex items-center gap-4 text-xs text-gray-500">
+        <span>
+          {companies.filter((c) => c.pipelineStage !== "Closed Won" && c.pipelineStage !== "Closed Lost").length}{" "}
+          open deals
+        </span>
+        <span>
+          {companies.filter((c) => c.pipelineStage === "Closed Won").length} won
+        </span>
+        <span className="ml-auto text-gray-600">Click a card for full context · drag to move</span>
+      </div>
       <div className="flex gap-4 overflow-x-auto pb-4">
         {PIPELINE_STAGES.map((stage) => (
           <Column
