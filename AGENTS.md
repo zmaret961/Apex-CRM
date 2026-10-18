@@ -9,7 +9,8 @@ or Cognition-internal system involved. Everything runs on localhost.
 ## Stack
 - Next.js 15 (App Router) + TypeScript + React 19
 - Tailwind CSS 3 — custom "liquid glass" dark design system
-- SQLite via better-sqlite3 (`data/apex.db`, auto-created + auto-seeded)
+- SQLite via better-sqlite3 (`data/apex.db`, auto-created + auto-seeded;
+   `PRAGMA user_version` data migrations patch existing DBs without reseeding)
 - MapLibre GL JS + react-map-gl with the free CARTO dark basemap
   (no API token required). To use real Mapbox instead, set
   `NEXT_PUBLIC_MAPBOX_TOKEN` and swap the style URL in `components/MapView.tsx`.
@@ -61,7 +62,10 @@ or Cognition-internal system involved. Everything runs on localhost.
    blog root, LinkedIn/Crunchbase org page, public press page).
 2. Confirmed Devin customers get `status: "customer"` and a green indicator
    everywhere. Only the publicly-discussed list in `data/dataset.ts` may have
-   this status.
+   this status. Companies that MAKE competing AI coding tools (OpenAI,
+   Anthropic, Microsoft, Google) get `status: "competitor"` (rose indicator)
+   — they're intel targets, never sell-to prospects: keep them out of
+   `pipelineStage` and out of Focus suggestions.
 3. Dark mode is the only mode. Liquid-glass surfaces (`glass` / `glass-deep`
    classes), hairline borders, `interactive` hover/pressed states on every
    control. The map and research views are the visual centerpieces — keep
