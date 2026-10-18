@@ -205,6 +205,9 @@ export default function CommandPalette() {
       onMouseDown={() => setOpen(false)}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
         className="glass-deep w-full max-w-lg overflow-hidden rounded-2xl shadow-glow"
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -214,6 +217,7 @@ export default function CommandPalette() {
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={onListKey}
           placeholder="Search companies, or pick an action…"
+          aria-label="Search companies and actions"
           className="w-full border-b border-white/10 bg-transparent px-5 py-4 text-sm text-white outline-none placeholder:text-gray-600"
         />
         <div ref={listRef} className="max-h-80 overflow-y-auto p-2">

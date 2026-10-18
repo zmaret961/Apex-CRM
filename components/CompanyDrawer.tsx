@@ -391,14 +391,20 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                   </div>
                 ))}
               </div>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex items-center gap-2">
                 <input
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && saveNote()}
+                  maxLength={2000}
                   placeholder="Add a note — call outcome, next step…"
                   className="interactive flex-1 rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-sm outline-none placeholder:text-gray-600 focus:border-accent/50"
                 />
+                {note.length > 1800 && (
+                  <span className="text-[10px] tabular-nums text-amber-300/80">
+                    {2000 - note.length}
+                  </span>
+                )}
                 <button
                   onClick={saveNote}
                   disabled={!note.trim() || savingNote}
