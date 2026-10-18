@@ -2,6 +2,7 @@ import { getDb } from "./db";
 import { PIPELINE_STAGES } from "./types";
 import type {
   Company,
+  SearchHit,
   CompanyEvent,
   CompanyStatus,
   ResearchBrief,
@@ -12,7 +13,7 @@ import type {
   IntelSummary,
 } from "./types";
 
-export const VALID_STATUSES: CompanyStatus[] = ["customer", "prospect", "researched"];
+export const VALID_STATUSES: CompanyStatus[] = ["customer", "prospect", "researched", "competitor"];
 
 export function isPipelineStage(v: unknown): v is PipelineStage {
   return typeof v === "string" && (PIPELINE_STAGES as readonly string[]).includes(v);
@@ -214,8 +215,8 @@ export function suggestedActions(limit = 12): FocusItem[] {
 
   const stalePipeline = db
     .prepare(
-      `SELECT id, name, status, fitScore, industry, pipelineStage FROM companies
-       WHERE discovered = 0 AND pipelineStage IS NOT NULL
+      `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage FROM companies
+       WHERE discovered = 0 AND status != 'competitor' AND pipelineStage IS NOT NULL
          AND pipelineStage NOT IN ('Closed Won','Closed Lost')
          AND (lastResearchAt IS NULL OR lastResearchAt < datetime('now','-30 days'))
        ORDER BY fitScore DESC`
@@ -232,8 +233,8 @@ export function suggestedActions(limit = 12): FocusItem[] {
 
   const advanceable = db
     .prepare(
-      `SELECT id, name, status, fitScore, industry, pipelineStage FROM companies
-       WHERE discovered = 0 AND pipelineStage IN ('Identified','Researched')
+      `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage FROM companies
+       WHERE discovered = 0 AND status != 'competitor' AND pipelineStage IN ('Identified','Researched')
          AND lastResearchAt IS NOT NULL AND lastResearchAt >= datetime('now','-30 days')
        ORDER BY fitScore DESC`
     )
@@ -254,7 +255,7 @@ export function suggestedActions(limit = 12): FocusItem[] {
 
   const customers = db
     .prepare(
-      `SELECT id, name, status, fitScore, industry, pipelineStage FROM companies
+      `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage FROM companies
        WHERE discovered = 0 AND status = 'customer'
          AND (lastResearchAt IS NULL OR lastResearchAt < datetime('now','-45 days'))
        ORDER BY fitScore DESC LIMIT 3`
@@ -272,7 +273,7 @@ export function suggestedActions(limit = 12): FocusItem[] {
 
   const unresearched = db
     .prepare(
-      `SELECT id, name, status, fitScore, industry, pipelineStage FROM companies
+      `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage FROM companies
        WHERE discovered = 0 AND status = 'prospect' AND lastResearchAt IS NULL
        ORDER BY fitScore DESC LIMIT ?`
     )
@@ -358,4 +359,41 @@ function hydrate(row: RawCompany): Company {
     sources: JSON.parse(row.sources || "[]"),
     signals: JSON.parse(row.signals || "[]"),
   };
+}
+
+// Full-text-ish search across sourced research — surfaces which accounts'
+// research mentions a term (e.g. "Copilot", "hiring"). LIKE-escaped, capped.
+export function searchResearch(q: string, limit = 8): SearchHit[] {
+  const needle = `%${q.replace(/[%_\\]/g, (m) => "\\" + m)}%`;
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT c.id AS companyId, c.name, c.status, c.fitScore,
+              substr(cl.text, 1, 140) AS snippet, 'claim' AS kind
+       FROM research_claims cl
+       JOIN research_briefs rb ON rb.id = cl.briefId
+       JOIN companies c ON c.id = rb.companyId
+       WHERE cl.text LIKE ? ESCAPE '\\'
+       UNION ALL
+       SELECT c.id AS companyId, c.name, c.status, c.fitScore,
+              substr(rb.whyNow, 1, 140) AS snippet, 'brief' AS kind
+       FROM research_briefs rb
+       JOIN companies c ON c.id = rb.companyId
+       WHERE rb.whyNow LIKE ? ESCAPE '\\' OR rb.whatTheyDo LIKE ? ESCAPE '\\'
+       ORDER BY fitScore DESC
+       LIMIT ?`
+    )
+    .all(needle, needle, needle, limit) as SearchHit[];
+}
+
+export function pipelineCounts(): Record<string, number> {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT pipelineStage AS stage, COUNT(*) AS c FROM companies
+       WHERE discovered = 0 AND pipelineStage IS NOT NULL
+       GROUP BY pipelineStage`
+    )
+    .all() as { stage: string; c: number }[];
+  return Object.fromEntries(rows.map((r) => [r.stage, r.c]));
 }

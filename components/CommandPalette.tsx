@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Company } from "@/lib/types";
+import type { Company, SearchHit } from "@/lib/types";
 import StatusPill from "./StatusPill";
 
 interface Action {
   id: string;
-  kind: "nav" | "action" | "company";
+  kind: "nav" | "action" | "company" | "research";
   label: string;
   hint?: string;
+  kindLabel?: string;
   run: () => void;
 }
 
@@ -21,6 +22,25 @@ const NAV: { id: string; label: string; href: string; key: string }[] = [
   { id: "nav-research", label: "Go to Research", href: "/research", key: "r" },
   { id: "nav-automation", label: "Go to Automation", href: "/automation", key: "u" },
 ];
+
+function exportCompaniesCsv(companies: Company[]) {
+  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const rows = [
+    ["name", "domain", "industry", "status", "pipelineStage", "fitScore", "employees", "funding", "estimatedValue", "address"],
+    ...companies.map((c) => [
+      c.name, c.domain, c.industry, c.status, c.pipelineStage ?? "", c.fitScore,
+      c.employees, c.funding, c.estimatedValue ?? "unconfirmed", c.address,
+    ]),
+  ];
+  const blob = new Blob([rows.map((r) => r.map(esc).join(",")).join("\n")], {
+    type: "text/csv",
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "apex-accounts.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 function isTypingTarget(t: EventTarget | null): boolean {
   return (
@@ -34,6 +54,7 @@ export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [hits, setHits] = useState<SearchHit[]>([]);
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -65,6 +86,21 @@ export default function CommandPalette() {
     }
   }, [open, companies.length]);
 
+  // Research search — debounced server lookup over claims + briefs.
+  useEffect(() => {
+    if (q.trim().length < 2) {
+      setHits([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(q.trim())}`)
+        .then((r) => r.json())
+        .then(setHits)
+        .catch(() => setHits([]));
+    }, 180);
+    return () => clearTimeout(t);
+  }, [q]);
+
   const actions = useMemo<Action[]>(() => {
     const list: Action[] = NAV.map((n) => ({
       id: n.id,
@@ -83,9 +119,16 @@ export default function CommandPalette() {
         router.push("/automation");
       },
     });
+    list.push({
+      id: "act-export",
+      kind: "action",
+      label: "Export accounts to CSV",
+      hint: "csv",
+      run: () => exportCompaniesCsv(companies),
+    });
     if (q.trim()) {
       const needle = q.trim().toLowerCase();
-      const hits = companies
+      const companyHits = companies
         .filter(
           (c) =>
             c.name.toLowerCase().includes(needle) ||
@@ -93,7 +136,7 @@ export default function CommandPalette() {
             c.industry.toLowerCase().includes(needle)
         )
         .slice(0, 7);
-      for (const c of hits) {
+      for (const c of companyHits) {
         list.push({
           id: `co-${c.id}`,
           kind: "company",
@@ -102,9 +145,24 @@ export default function CommandPalette() {
           run: () => router.push(`/?focus=${c.id}`),
         });
       }
+      // Research hits on accounts not already listed as company matches.
+      const shown = new Set(companyHits.map((c) => c.id));
+      for (const h of hits) {
+        if (shown.has(h.companyId)) continue;
+        shown.add(h.companyId);
+        list.push({
+          id: `re-${h.companyId}`,
+          kind: "research",
+          label: h.name,
+          hint: `fit ${h.fitScore}`,
+          kindLabel: "research",
+          run: () => router.push(`/?focus=${h.companyId}`),
+        });
+        if (list.length > 14) break;
+      }
     }
     return list;
-  }, [q, companies, router]);
+  }, [q, companies, hits, router]);
 
   useEffect(() => setCursor(0), [q]);
 
@@ -176,9 +234,14 @@ export default function CommandPalette() {
               >
                 <span className="flex min-w-0 items-center gap-2.5">
                   <span className="w-4 shrink-0 text-center text-xs text-gray-500">
-                    {a.kind === "company" ? "▸" : a.kind === "action" ? "⚡" : "↪"}
+                    {a.kind === "company" ? "▸" : a.kind === "action" ? "⚡" : a.kind === "research" ? "◆" : "↪"}
                   </span>
                   <span className="truncate">{a.label}</span>
+                  {a.kindLabel && (
+                    <span className="shrink-0 rounded-full bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-gray-500">
+                      {a.kindLabel}
+                    </span>
+                  )}
                   {co && <StatusPill status={co.status} />}
                 </span>
                 {a.hint && (

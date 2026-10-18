@@ -15,6 +15,7 @@ const INDUSTRIES = [
 
 export default function AccountsList() {
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [q, setQ] = useState("");
   const [industry, setIndustry] = useState("");
   const [status, setStatus] = useState("");
@@ -40,10 +41,31 @@ export default function AccountsList() {
           if (sort === "name") list.sort((a, b) => a.name.localeCompare(b.name));
           else if (sort === "employees") list.sort((a, b) => b.employees - a.employees);
           setCompanies(list);
+          setLoaded(true);
         });
     }, 180);
     return () => clearTimeout(t);
   }, [q, industry, status, sort]);
+
+  function exportCsv() {
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = [
+      ["name", "domain", "industry", "status", "pipelineStage", "fitScore", "employees", "funding", "estimatedValue", "address", "lastResearchAt"],
+      ...companies.map((c) => [
+        c.name, c.domain, c.industry, c.status, c.pipelineStage ?? "", c.fitScore,
+        c.employees, c.funding, c.estimatedValue ?? "unconfirmed", c.address,
+        c.lastResearchAt ?? "",
+      ]),
+    ];
+    const blob = new Blob([rows.map((r) => r.map(esc).join(",")).join("\n")], {
+      type: "text/csv",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "apex-accounts.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
 
   return (
     <>
@@ -73,6 +95,7 @@ export default function AccountsList() {
           <option value="customer">Customers</option>
           <option value="prospect">Prospects</option>
           <option value="researched">Researched</option>
+          <option value="competitor">Competitors</option>
         </select>
         <select
           value={sort}
@@ -84,12 +107,26 @@ export default function AccountsList() {
           <option value="name">Sort: name</option>
           <option value="employees">Sort: size</option>
         </select>
+        <button
+          onClick={exportCsv}
+          title="Download the current view as CSV"
+          className="interactive rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-gray-400 hover:border-accent/40 hover:text-white"
+        >
+          Export CSV
+        </button>
         <span className="ml-auto text-xs text-gray-500">{companies.length} accounts</span>
       </div>
 
-      {companies.length === 0 && (
+      {loaded && companies.length === 0 && (
         <div className="glass rounded-2xl p-12 text-center text-sm text-gray-500">
           No accounts match these filters.
+        </div>
+      )}
+      {!loaded && (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="glass h-28 animate-pulse rounded-2xl" />
+          ))}
         </div>
       )}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -122,11 +159,6 @@ export default function AccountsList() {
           </button>
         ))}
       </div>
-      {companies.length === 0 && (
-        <div className="glass rounded-2xl p-12 text-center text-sm text-gray-500">
-          No accounts match these filters.
-        </div>
-      )}
       <CompanyDrawer companyId={selected} onClose={() => setSelected(null)} />
     </>
   );

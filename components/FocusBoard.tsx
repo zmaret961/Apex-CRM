@@ -9,7 +9,17 @@ import clsx from "clsx";
 interface FocusData {
   items: FocusItem[];
   intel: IntelSummary;
+  pipeline: Record<string, number>;
 }
+
+const STAGE_ORDER = [
+  "Identified",
+  "Researched",
+  "Engaged",
+  "Demo Scheduled",
+  "Proposal",
+  "Closed Won",
+];
 
 const ACTION_TONE: Record<FocusItem["action"], string> = {
   "re-research": "border-amber-300/30 bg-amber-400/10 text-amber-300",
@@ -17,11 +27,55 @@ const ACTION_TONE: Record<FocusItem["action"], string> = {
   research: "border-violet-300/30 bg-violet-400/10 text-violet-300",
 };
 
+const SNOOZE_KEY = "apex-focus-snoozed";
+const SNOOZE_DAYS = 7;
+
+function loadSnoozed(): Map<number, number> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SNOOZE_KEY) ?? "{}") as Record<string, number>;
+    const now = Date.now();
+    return new Map(
+      Object.entries(raw)
+        .map(([k, v]) => [Number(k), v] as [number, number])
+        .filter(([, until]) => until > now)
+    );
+  } catch {
+    return new Map();
+  }
+}
+
 export default function FocusBoard() {
   const [data, setData] = useState<FocusData | null>(null);
   const [done, setDone] = useState<Set<number>>(new Set());
+  const [snoozed, setSnoozed] = useState<Map<number, number>>(new Map());
   const [busy, setBusy] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
+
+  useEffect(() => {
+    setSnoozed(loadSnoozed());
+  }, []);
+
+  function snooze(id: number) {
+    const until = Date.now() + SNOOZE_DAYS * 86400000;
+    setSnoozed((m) => {
+      const next = new Map(m).set(id, until);
+      try {
+        localStorage.setItem(SNOOZE_KEY, JSON.stringify(Object.fromEntries(next)));
+      } catch { /* storage unavailable */ }
+      return next;
+    });
+  }
+
+  function unsnooze(id: number) {
+    setSnoozed((m) => {
+      const next = new Map(m);
+      next.delete(id);
+      try {
+        localStorage.setItem(SNOOZE_KEY, JSON.stringify(Object.fromEntries(next)));
+      } catch { /* storage unavailable */ }
+      return next;
+    });
+  }
 
   async function load() {
     const d = await fetch("/api/focus").then((r) => r.json());
@@ -49,11 +103,33 @@ export default function FocusBoard() {
     setDone((s) => new Set(s).add(item.companyId));
   }
 
-  const pending = (data?.items ?? []).filter((i) => !done.has(i.companyId));
+  const pending = (data?.items ?? []).filter(
+    (i) => !done.has(i.companyId) && !snoozed.has(i.companyId)
+  );
   const completed = (data?.items ?? []).filter((i) => done.has(i.companyId));
+  const snoozedItems = (data?.items ?? []).filter((i) => snoozed.has(i.companyId));
 
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+    <div>
+      {data && (
+        <div className="glass mb-5 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-2xl px-4 py-2.5 text-xs">
+          <span className="font-semibold uppercase tracking-wider text-gray-500">
+            Pipeline
+          </span>
+          {STAGE_ORDER.map((s) => (
+            <span key={s} className="text-gray-400">
+              {s.replace("Closed ", "")}{" "}
+              <span className={clsx("font-medium", s === "Closed Won" ? "text-emerald-300" : "text-white")}>
+                {data.pipeline[s] ?? 0}
+              </span>
+            </span>
+          ))}
+          <span className="ml-auto text-gray-500">
+            {pending.length} suggestion{pending.length === 1 ? "" : "s"} open
+          </span>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
       <div className="space-y-3 lg:col-span-2">
         {!data && <div className="glass rounded-2xl p-8 text-center text-sm text-gray-500">Loading…</div>}
         {data && pending.length === 0 && (
@@ -84,16 +160,25 @@ export default function FocusBoard() {
               </div>
               <p className="mt-1 text-xs leading-relaxed text-gray-400">{item.reason}</p>
             </button>
-            <button
-              onClick={() => act(item)}
-              disabled={busy === item.companyId}
-              className={clsx(
-                "interactive shrink-0 rounded-xl border px-3.5 py-2 text-xs font-medium",
-                ACTION_TONE[item.action]
-              )}
-            >
-              {busy === item.companyId ? "Working…" : item.label}
-            </button>
+            <div className="flex shrink-0 flex-col items-end gap-1.5">
+              <button
+                onClick={() => act(item)}
+                disabled={busy === item.companyId}
+                className={clsx(
+                  "interactive rounded-xl border px-3.5 py-2 text-xs font-medium",
+                  ACTION_TONE[item.action]
+                )}
+              >
+                {busy === item.companyId ? "Working…" : item.label}
+              </button>
+              <button
+                onClick={() => snooze(item.companyId)}
+                title={`Hide for ${SNOOZE_DAYS} days`}
+                className="text-[11px] text-gray-600 hover:text-gray-400"
+              >
+                snooze {SNOOZE_DAYS}d
+              </button>
+            </div>
           </div>
         ))}
         {completed.map((item) => (
@@ -107,6 +192,27 @@ export default function FocusBoard() {
             <span className="shrink-0 text-xs text-emerald-300">done</span>
           </div>
         ))}
+        {snoozedItems.length > 0 && (
+          <div className="glass rounded-2xl p-3">
+            <div className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600">
+              Snoozed · {snoozedItems.length}
+            </div>
+            {snoozedItems.map((item) => (
+              <div
+                key={`snoozed-${item.companyId}`}
+                className="flex items-center justify-between rounded-lg px-2 py-1 text-xs"
+              >
+                <span className="truncate text-gray-500">{item.name}</span>
+                <button
+                  onClick={() => unsnooze(item.companyId)}
+                  className="interactive ml-2 rounded px-1.5 py-0.5 text-[10px] text-accent-soft hover:bg-accent/10"
+                >
+                  restore
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Competitive intel rollup */}
@@ -164,6 +270,7 @@ export default function FocusBoard() {
       </div>
 
       <CompanyDrawer companyId={selected} onClose={() => setSelected(null)} />
+      </div>
     </div>
   );
 }

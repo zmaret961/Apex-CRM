@@ -22,6 +22,12 @@ export default function KanbanBoard() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
+  const [toast, setToast] = useState<{
+    id: number;
+    name: string;
+    from: PipelineStage | null;
+    to: PipelineStage;
+  } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   async function load() {
@@ -46,6 +52,14 @@ export default function KanbanBoard() {
     setActiveId(Number(e.active.id));
   }
 
+  async function moveTo(id: number, stage: PipelineStage | null) {
+    await fetch(`/api/companies/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pipelineStage: stage }),
+    });
+  }
+
   async function onDragEnd(e: DragEndEvent) {
     setActiveId(null);
     const id = Number(e.active.id);
@@ -53,14 +67,23 @@ export default function KanbanBoard() {
     if (!stage || !PIPELINE_STAGES.includes(stage)) return;
     const company = companies.find((c) => c.id === id);
     if (!company || company.pipelineStage === stage) return;
+    const from = company.pipelineStage;
     setCompanies((prev) =>
       prev.map((c) => (c.id === id ? { ...c, pipelineStage: stage } : c))
     );
-    await fetch(`/api/companies/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pipelineStage: stage }),
-    });
+    await moveTo(id, stage);
+    setToast({ id, name: company.name, from, to: stage });
+    setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 6000);
+  }
+
+  async function undo() {
+    if (!toast) return;
+    const { id, from } = toast;
+    setCompanies((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, pipelineStage: from } : c))
+    );
+    setToast(null);
+    await moveTo(id, from);
   }
 
   const active = activeId != null ? companies.find((c) => c.id === activeId) : null;
@@ -95,6 +118,20 @@ export default function KanbanBoard() {
         onClose={() => setSelected(null)}
         onAdded={load}
       />
+      {toast && (
+        <div className="glass-deep animate-fade-up fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-4 rounded-xl px-5 py-3 text-sm shadow-glow">
+          <span className="text-gray-300">
+            <span className="font-medium text-white">{toast.name}</span>
+            {toast.from ? ` moved ${toast.from} → ${toast.to}` : ` added to ${toast.to}`}
+          </span>
+          <button
+            onClick={undo}
+            className="interactive rounded-lg border border-accent/40 px-2.5 py-1 text-xs font-medium text-accent-soft hover:bg-accent/15"
+          >
+            Undo
+          </button>
+        </div>
+      )}
     </DndContext>
   );
 }
@@ -147,8 +184,12 @@ function Column({
   );
 }
 
+function stageDays(ts: string): number {
+  return Math.max(0, Math.floor((Date.now() - new Date(ts + "Z").getTime()) / 86400000));
+}
+
 function daysAgo(ts: string): string {
-  const d = Math.max(0, Math.floor((Date.now() - new Date(ts + "Z").getTime()) / 86400000));
+  const d = stageDays(ts);
   return d === 0 ? "today" : `${d}d`;
 }
 
@@ -198,7 +239,18 @@ function Card({ company, overlay }: { company: Company; overlay?: boolean }) {
         <span className={company.estimatedValue ? "text-emerald-300" : "text-gray-400"}>
           {company.estimatedValue ?? `unconfirmed · fit ${company.fitScore}`}
         </span>
-        <span className="text-gray-600">
+        <span
+          className={
+            company.stageChangedAt && stageDays(company.stageChangedAt) > 30
+              ? "font-medium text-amber-300/80"
+              : "text-gray-600"
+          }
+          title={
+            company.stageChangedAt && stageDays(company.stageChangedAt) > 30
+              ? "Sitting in this stage over a month — check Focus for next steps"
+              : undefined
+          }
+        >
           {company.stageChangedAt
             ? `${daysAgo(company.stageChangedAt)} in stage`
             : company.lastResearchAt

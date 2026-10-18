@@ -61,7 +61,9 @@ See `AGENTS.md` for the full rules.
 ## Speed layer
 
 - **⌘K / Ctrl-K** opens the command palette anywhere: fuzzy-find any account
-  (jump straight to its pin on the map), run a research sweep, or hop pages.
+  (jump straight to its pin on the map), **search all research** (type
+  "copilot" → every account whose brief mentions it), run a research sweep,
+  export the book to CSV, or hop pages.
 - Single-key nav when not typing: `m` map · `f` focus · `o` opportunities ·
   `a` accounts · `r` research · `u` automation. `Esc` closes the drawer.
 - The company drawer has a per-account **activity timeline** (pipeline moves,
@@ -69,8 +71,12 @@ See `AGENTS.md` for the full rules.
   the board stays honest with zero data entry.
 - **Copy brief** in the drawer copies a markdown outreach brief (fit, signals,
   why-now, cited evidence) straight into your clipboard.
-- Kanban cards show **days in stage** (from the event log), and the drawer can
-  advance or remove a deal without leaving the page.
+- Kanban cards show **days in stage** (from the event log, amber past 30d),
+  every drag move posts an **Undo toast**, and the drawer can advance or
+  remove a deal without leaving the page.
+- **Focus** opens with a pipeline-at-a-glance strip; suggestions can be
+  **snoozed 7 days** and restored inline.
+- **Accounts** exports the current filtered view to CSV in one click.
 
 ## Notes
 

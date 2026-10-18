@@ -1,4 +1,4 @@
-export type CompanyStatus = "customer" | "prospect" | "researched";
+export type CompanyStatus = "customer" | "prospect" | "researched" | "competitor";
 
 export const PIPELINE_STAGES = [
   "Identified",
@@ -108,4 +108,13 @@ export interface IntelTool {
 export interface IntelSummary {
   tools: IntelTool[];
   competitorClaims: number;
+}
+
+export interface SearchHit {
+  companyId: number;
+  name: string;
+  status: CompanyStatus;
+  fitScore: number;
+  kind: "claim" | "brief";
+  snippet: string;
 }

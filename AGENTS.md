@@ -9,7 +9,8 @@ or Cognition-internal system involved. Everything runs on localhost.
 ## Stack
 - Next.js 15 (App Router) + TypeScript + React 19
 - Tailwind CSS 3 — custom "liquid glass" dark design system
-- SQLite via better-sqlite3 (`data/apex.db`, auto-created + auto-seeded)
+- SQLite via better-sqlite3 (`data/apex.db`, auto-created + auto-seeded;
+   `PRAGMA user_version` data migrations patch existing DBs without reseeding)
 - MapLibre GL JS + react-map-gl with the free CARTO dark basemap
   (no API token required). To use real Mapbox instead, set
   `NEXT_PUBLIC_MAPBOX_TOKEN` and swap the style URL in `components/MapView.tsx`.
@@ -24,6 +25,7 @@ or Cognition-internal system involved. Everything runs on localhost.
   brief synthesizer. `lib/agent.ts` — in-process research-sweep runner.
 - `app/api/*` — thin JSON routes over those libs (`/api/companies`,
   `/api/companies/[id]`, `/api/research`, `/api/agent`, `/api/focus`).
+  Accounts exports the current filtered view to CSV client-side (no backend).
 - `app/page.tsx` = Map (index). `/focus`, `/accounts`, `/opportunities`,
   `/research`, `/automation`.
 - `components/CompanyDrawer.tsx` — the shared slide-over used by Map,
@@ -60,7 +62,10 @@ or Cognition-internal system involved. Everything runs on localhost.
    blog root, LinkedIn/Crunchbase org page, public press page).
 2. Confirmed Devin customers get `status: "customer"` and a green indicator
    everywhere. Only the publicly-discussed list in `data/dataset.ts` may have
-   this status.
+   this status. Companies that MAKE competing AI coding tools (OpenAI,
+   Anthropic, Microsoft, Google) get `status: "competitor"` (rose indicator)
+   — they're intel targets, never sell-to prospects: keep them out of
+   `pipelineStage` and out of Focus suggestions.
 3. Dark mode is the only mode. Liquid-glass surfaces (`glass` / `glass-deep`
    classes), hairline borders, `interactive` hover/pressed states on every
    control. The map and research views are the visual centerpieces — keep
@@ -69,7 +74,9 @@ or Cognition-internal system involved. Everything runs on localhost.
    fully offline after `npm install`.
 5. **The CRM suggests; the seller clicks.** Prefer surfacing next actions
    (Focus page, auto-logged activity) over adding form fields — data entry
-   is a tax on selling time.
+   is a tax on selling time. Forgiving controls beat confirmations: every
+   kanban stage move posts an Undo toast; Focus suggestions can be snoozed
+   for 7 days (localStorage, restorable inline).
 6. API writes are validated (`isPipelineStage`, `isCompanyStatus`). Notes
    are capped at 2000 chars. Don't accept unvalidated writes.
 
