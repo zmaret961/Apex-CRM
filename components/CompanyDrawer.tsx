@@ -151,6 +151,16 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setSavingNote(false);
   }
 
+  async function deleteNote(eventId: number) {
+    if (!company) return;
+    await fetch(`/api/companies/${company.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deleteNote: eventId }),
+    });
+    setEvents((es) => es.filter((e) => e.id !== eventId));
+  }
+
   async function copyOutreachBrief() {
     if (!company) return;
     const lines: string[] = [
@@ -394,7 +404,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                   <p className="text-sm text-gray-600">No activity yet.</p>
                 )}
                 {events.map((e) => (
-                  <div key={e.id} className="flex gap-3 text-sm">
+                  <div key={e.id} className="group flex gap-3 text-sm">
                     <span
                       className={`mt-0.5 shrink-0 text-[10px] font-medium uppercase tracking-wide ${EVENT_TONE[e.type]}`}
                     >
@@ -406,6 +416,15 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                         {new Date(e.ts + "Z").toLocaleString()}
                       </p>
                     </div>
+                    {e.type === "note" && (
+                      <button
+                        onClick={() => deleteNote(e.id)}
+                        title="Delete note"
+                        className="interactive -my-1 shrink-0 self-start rounded px-1.5 py-0.5 text-xs text-gray-600 opacity-0 transition-opacity hover:text-rose-300 group-hover:opacity-100"
+                      >
+                        ×
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

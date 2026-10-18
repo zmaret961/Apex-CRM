@@ -111,6 +111,14 @@ export function addEvent(companyId: number, type: CompanyEvent["type"], text: st
   );
 }
 
+export function deleteNote(companyId: number, eventId: number): boolean {
+  const db = getDb();
+  const r = db
+    .prepare("DELETE FROM company_events WHERE id = ? AND companyId = ? AND type = 'note'")
+    .run(eventId, companyId);
+  return r.changes > 0;
+}
+
 export function eventsFor(companyId: number): CompanyEvent[] {
   const db = getDb();
   return db

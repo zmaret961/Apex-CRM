@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   addEvent,
   briefsFor,
+  deleteNote,
   eventsFor,
   getCompany,
   isCompanyStatus,
@@ -61,6 +62,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (note.length > 2000)
       return NextResponse.json({ error: "note too long" }, { status: 400 });
     addEvent(companyId, "note", note);
+  }
+  if ("deleteNote" in body) {
+    const eventId = Number(body.deleteNote);
+    if (!Number.isInteger(eventId) || eventId <= 0) {
+      return NextResponse.json({ error: "deleteNote must be an event id" }, { status: 400 });
+    }
+    deleteNote(companyId, eventId);
   }
   return NextResponse.json(getCompany(companyId));
 }
