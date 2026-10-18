@@ -288,6 +288,24 @@ export function suggestedActions(limit = 12): FocusItem[] {
     });
   }
 
+  const competitors = db
+    .prepare(
+      `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage FROM companies
+       WHERE discovered = 0 AND status = 'competitor'
+         AND (lastResearchAt IS NULL OR lastResearchAt < datetime('now','-30 days'))
+       ORDER BY fitScore DESC LIMIT 2`
+    )
+    .all() as Omit<FocusItem, "action" | "label" | "reason">[];
+  for (const c of competitors) {
+    items.push({
+      ...c,
+      action: "re-research",
+      label: "Refresh competitor intel",
+      reason:
+        "Ships a rival AI coding product — stale intel means stale talk tracks when it comes up on calls.",
+    });
+  }
+
   const unresearched = db
     .prepare(
       `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage FROM companies
