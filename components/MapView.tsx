@@ -37,6 +37,7 @@ export default function MapView() {
   const [mapRef, setMapRef] = useState<MapRef | null>(null);
   const [hovered, setHovered] = useState<Company | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     const p = new URLSearchParams();
@@ -45,7 +46,10 @@ export default function MapView() {
     if (minFit) p.set("minFit", String(minFit));
     fetch(`/api/companies?${p}`)
       .then((r) => r.json())
-      .then(setCompanies);
+      .then((list) => {
+        setCompanies(list);
+        setLoaded(true);
+      });
   }, [industry, status, minFit]);
 
   // Deep link: /?focus=<id> opens the company drawer and flies to its pin
@@ -247,6 +251,23 @@ export default function MapView() {
           {companies.length} companies
         </span>
       </div>
+
+      {/* filtered-to-zero notice */}
+      {loaded && companies.length === 0 && (
+        <div className="glass absolute left-1/2 top-40 z-30 -translate-x-1/2 rounded-2xl px-5 py-3 text-sm text-gray-300">
+          No companies match these filters —
+          <button
+            onClick={() => {
+              setIndustry("");
+              setStatus("");
+              setMinFit(0);
+            }}
+            className="ml-1.5 text-accent-soft hover:underline"
+          >
+            reset
+          </button>
+        </div>
+      )}
 
       {/* legend */}
       <div className="glass absolute bottom-6 left-6 z-30 space-y-1.5 rounded-2xl px-4 py-3 text-xs">

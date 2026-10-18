@@ -17,11 +17,44 @@ const ACTION_TONE: Record<FocusItem["action"], string> = {
   research: "border-violet-300/30 bg-violet-400/10 text-violet-300",
 };
 
+const SNOOZE_KEY = "apex-focus-snoozed";
+const SNOOZE_DAYS = 7;
+
+function loadSnoozed(): Map<number, number> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SNOOZE_KEY) ?? "{}") as Record<string, number>;
+    const now = Date.now();
+    return new Map(
+      Object.entries(raw)
+        .map(([k, v]) => [Number(k), v] as [number, number])
+        .filter(([, until]) => until > now)
+    );
+  } catch {
+    return new Map();
+  }
+}
+
 export default function FocusBoard() {
   const [data, setData] = useState<FocusData | null>(null);
   const [done, setDone] = useState<Set<number>>(new Set());
+  const [snoozed, setSnoozed] = useState<Map<number, number>>(new Map());
   const [busy, setBusy] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
+
+  useEffect(() => {
+    setSnoozed(loadSnoozed());
+  }, []);
+
+  function snooze(id: number) {
+    const until = Date.now() + SNOOZE_DAYS * 86400000;
+    setSnoozed((m) => {
+      const next = new Map(m).set(id, until);
+      try {
+        localStorage.setItem(SNOOZE_KEY, JSON.stringify(Object.fromEntries(next)));
+      } catch { /* storage unavailable */ }
+      return next;
+    });
+  }
 
   async function load() {
     const d = await fetch("/api/focus").then((r) => r.json());
@@ -49,7 +82,9 @@ export default function FocusBoard() {
     setDone((s) => new Set(s).add(item.companyId));
   }
 
-  const pending = (data?.items ?? []).filter((i) => !done.has(i.companyId));
+  const pending = (data?.items ?? []).filter(
+    (i) => !done.has(i.companyId) && !snoozed.has(i.companyId)
+  );
   const completed = (data?.items ?? []).filter((i) => done.has(i.companyId));
 
   return (
@@ -84,16 +119,25 @@ export default function FocusBoard() {
               </div>
               <p className="mt-1 text-xs leading-relaxed text-gray-400">{item.reason}</p>
             </button>
-            <button
-              onClick={() => act(item)}
-              disabled={busy === item.companyId}
-              className={clsx(
-                "interactive shrink-0 rounded-xl border px-3.5 py-2 text-xs font-medium",
-                ACTION_TONE[item.action]
-              )}
-            >
-              {busy === item.companyId ? "Working…" : item.label}
-            </button>
+            <div className="flex shrink-0 flex-col items-end gap-1.5">
+              <button
+                onClick={() => act(item)}
+                disabled={busy === item.companyId}
+                className={clsx(
+                  "interactive rounded-xl border px-3.5 py-2 text-xs font-medium",
+                  ACTION_TONE[item.action]
+                )}
+              >
+                {busy === item.companyId ? "Working…" : item.label}
+              </button>
+              <button
+                onClick={() => snooze(item.companyId)}
+                title={`Hide for ${SNOOZE_DAYS} days`}
+                className="text-[11px] text-gray-600 hover:text-gray-400"
+              >
+                snooze {SNOOZE_DAYS}d
+              </button>
+            </div>
           </div>
         ))}
         {completed.map((item) => (

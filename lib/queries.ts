@@ -214,7 +214,7 @@ export function suggestedActions(limit = 12): FocusItem[] {
 
   const stalePipeline = db
     .prepare(
-      `SELECT id, name, status, fitScore, industry, pipelineStage FROM companies
+      `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage FROM companies
        WHERE discovered = 0 AND pipelineStage IS NOT NULL
          AND pipelineStage NOT IN ('Closed Won','Closed Lost')
          AND (lastResearchAt IS NULL OR lastResearchAt < datetime('now','-30 days'))
@@ -232,7 +232,7 @@ export function suggestedActions(limit = 12): FocusItem[] {
 
   const advanceable = db
     .prepare(
-      `SELECT id, name, status, fitScore, industry, pipelineStage FROM companies
+      `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage FROM companies
        WHERE discovered = 0 AND pipelineStage IN ('Identified','Researched')
          AND lastResearchAt IS NOT NULL AND lastResearchAt >= datetime('now','-30 days')
        ORDER BY fitScore DESC`
@@ -254,7 +254,7 @@ export function suggestedActions(limit = 12): FocusItem[] {
 
   const customers = db
     .prepare(
-      `SELECT id, name, status, fitScore, industry, pipelineStage FROM companies
+      `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage FROM companies
        WHERE discovered = 0 AND status = 'customer'
          AND (lastResearchAt IS NULL OR lastResearchAt < datetime('now','-45 days'))
        ORDER BY fitScore DESC LIMIT 3`
@@ -272,7 +272,7 @@ export function suggestedActions(limit = 12): FocusItem[] {
 
   const unresearched = db
     .prepare(
-      `SELECT id, name, status, fitScore, industry, pipelineStage FROM companies
+      `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage FROM companies
        WHERE discovered = 0 AND status = 'prospect' AND lastResearchAt IS NULL
        ORDER BY fitScore DESC LIMIT ?`
     )
