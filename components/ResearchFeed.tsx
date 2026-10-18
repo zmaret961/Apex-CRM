@@ -47,10 +47,15 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
   }
 
   const categories = [...new Set(briefs.flatMap((b) => b.claims.map((c) => c.category)))];
+  const needle = q.trim().toLowerCase();
   const filtered = briefs.filter(
     (b) =>
       (!category || b.claims.some((c) => c.category === category)) &&
-      (!q || (b.companyName ?? "").toLowerCase().includes(q.toLowerCase()))
+      (!needle ||
+        [b.companyName ?? "", b.whatTheyDo, b.whyNow, ...b.claims.map((c) => `${c.category} ${c.text}`)]
+          .join("\n")
+          .toLowerCase()
+          .includes(needle))
   );
 
   return (
@@ -59,7 +64,7 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Filter by company…"
+          placeholder="Search briefs — company, 'Copilot', 'hiring'…"
           className="interactive w-48 rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-sm outline-none placeholder:text-gray-600 focus:border-accent/50"
         />
         {categories.map((c) => (
@@ -124,6 +129,18 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
               <span className="font-medium text-accent-soft">Why now — </span>
               {b.whyNow}
             </div>
+            {!open && needle && (
+              <ul className="mt-2 space-y-1">
+                {b.claims
+                  .filter((c) => `${c.category} ${c.text}`.toLowerCase().includes(needle))
+                  .slice(0, 2)
+                  .map((c) => (
+                    <li key={c.id} className="truncate text-xs text-accent-soft/90">
+                      → {c.text}
+                    </li>
+                  ))}
+              </ul>
+            )}
             {open && (
               <ul className="mt-4 space-y-2 border-t border-white/5 pt-4">
                 {b.claims.map((c) => (
