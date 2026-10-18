@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Company, CompanyEvent, FocusItem, PipelineStage, ResearchBrief } from "@/lib/types";
 import { PIPELINE_STAGES } from "@/lib/types";
 import StatusPill from "./StatusPill";
@@ -41,6 +41,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [acting, setActing] = useState(false);
   const [editingValue, setEditingValue] = useState(false);
   const [valueDraft, setValueDraft] = useState("");
+  const [removedStage, setRemovedStage] = useState<PipelineStage | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (companyId == null) {
@@ -48,6 +50,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
       return;
     }
     setAdded(false);
+    setRemovedStage(null);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
     fetch(`/api/companies/${companyId}`)
       .then((r) => r.json())
       .then((d) => {
@@ -96,7 +100,21 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   }
 
   async function removeFromPipeline() {
+    if (!company || company.pipelineStage == null) return;
+    const prev = company.pipelineStage;
     await patch({ pipelineStage: null });
+    setRemovedStage(prev);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoTimer.current = setTimeout(() => setRemovedStage(null), 6000);
+    onAdded?.();
+  }
+
+  async function undoRemove() {
+    if (!removedStage) return;
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    const stage = removedStage;
+    setRemovedStage(null);
+    await patch({ pipelineStage: stage });
     onAdded?.();
   }
 
@@ -440,6 +458,14 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 className="interactive -mt-3 w-full rounded-xl border border-white/10 py-2 text-xs text-gray-500 hover:border-rose-400/30 hover:text-rose-300"
               >
                 Remove from pipeline
+              </button>
+            )}
+            {company.pipelineStage == null && removedStage != null && (
+              <button
+                onClick={undoRemove}
+                className="interactive -mt-3 w-full rounded-xl border border-amber-400/30 bg-amber-400/10 py-2 text-xs font-medium text-amber-300 hover:bg-amber-400/20"
+              >
+                Removed from pipeline — Undo (was {removedStage})
               </button>
             )}
           </div>
