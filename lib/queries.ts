@@ -83,6 +83,48 @@ export function getCompany(id: number): Company | null {
   return row ? hydrate(row) : null;
 }
 
+export function addCompany(input: {
+  name: string;
+  domain: string;
+  industry: string;
+  address: string;
+  lat: number;
+  lng: number;
+  employees: number;
+  funding: string;
+  description: string;
+  fitScore: number;
+  sourceUrl: string;
+  signal?: string;
+}): Company {
+  const db = getDb();
+  const r = db
+    .prepare(
+      `INSERT INTO companies (name, domain, industry, address, lat, lng, employees, funding,
+         status, fitScore, pipelineStage, estimatedValue, lastResearchAt, description,
+         sources, signals, discovered)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'prospect', ?, NULL, NULL, NULL, ?, ?, ?, 0)`
+    )
+    .run(
+      input.name,
+      input.domain,
+      input.industry,
+      input.address,
+      input.lat,
+      input.lng,
+      input.employees,
+      input.funding,
+      input.fitScore,
+      input.description,
+      JSON.stringify([input.sourceUrl]),
+      JSON.stringify(input.signal ? [{ text: input.signal, source: input.sourceUrl }] : [])
+    );
+  const id = Number(r.lastInsertRowid);
+  addEvent(id, "import", "Added manually by seller");
+  log("crm", "info", `${input.name}: added manually (domain ${input.domain})`);
+  return getCompany(id)!;
+}
+
 export function updatePipeline(id: number, stage: PipelineStage | null) {
   const db = getDb();
   const prev = db.prepare("SELECT pipelineStage, name FROM companies WHERE id = ?").get(id) as

@@ -22,6 +22,7 @@ export default function AccountsList() {
   const [stage, setStage] = useState("");
   const [sort, setSort] = useState<"fit" | "name" | "employees">("fit");
   const [selected, setSelected] = useState<number | null>(null);
+  const [adding, setAdding] = useState(false);
 
   // Deep link: /accounts?open=<id> opens the shared company drawer.
   const searchParams = useSearchParams();
@@ -147,6 +148,13 @@ export default function AccountsList() {
         >
           Export CSV
         </button>
+        <button
+          onClick={() => setAdding(true)}
+          title="Add a company that isn't tracked yet"
+          className="interactive rounded-lg border border-accent/30 bg-accent/10 px-2.5 py-1.5 text-xs font-medium text-accent-soft hover:bg-accent/20"
+        >
+          + Add company
+        </button>
         <span className="ml-auto text-xs text-gray-500">
           {companies.length} accounts
           {selected != null && <span className="text-gray-600"> · ↑↓ steps through profiles</span>}
@@ -196,6 +204,150 @@ export default function AccountsList() {
         ))}
       </div>
       <CompanyDrawer companyId={selected} onClose={() => setSelected(null)} />
+      {adding && (
+        <AddCompanyModal
+          industries={INDUSTRIES}
+          onClose={() => setAdding(false)}
+          onCreated={(id) => {
+            setAdding(false);
+            setSelected(id);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+function AddCompanyModal({
+  industries,
+  onClose,
+  onCreated,
+}: {
+  industries: string[];
+  onClose: () => void;
+  onCreated: (id: number) => void;
+}) {
+  const [form, setForm] = useState({
+    name: "",
+    domain: "",
+    industry: industries[0],
+    address: "",
+    employees: "",
+    funding: "",
+    fitScore: 60,
+    sourceUrl: "",
+    signal: "",
+  });
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((f) => ({ ...f, [k]: k === "fitScore" ? Number(e.target.value) : e.target.value }));
+
+  async function submit() {
+    setSaving(true);
+    setError("");
+    const r = await fetch("/api/companies", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...form, employees: Number(form.employees) || 0 }),
+    });
+    const d = await r.json().catch(() => ({}));
+    setSaving(false);
+    if (!r.ok) {
+      setError(d.error ?? "Could not add company");
+      return;
+    }
+    onCreated(d.id);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]"
+      onClick={onClose}
+    >
+      <div
+        className="glass-deep w-full max-w-md space-y-3 rounded-2xl p-6"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label="Add company"
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-white">Add company</h3>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="interactive rounded-lg border border-white/10 px-2.5 py-1 text-gray-400 hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Name *" value={form.name} onChange={set("name")} placeholder="Acme Corp" />
+          <Field label="Domain *" value={form.domain} onChange={set("domain")} placeholder="acme.com" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-xs text-gray-400">
+            Industry
+            <select
+              value={form.industry}
+              onChange={set("industry")}
+              className="interactive mt-1 w-full rounded-lg border border-white/10 bg-transparent px-2.5 py-1.5 text-sm text-gray-200 [&>option]:bg-base-900"
+            >
+              {industries.map((i) => <option key={i} value={i}>{i}</option>)}
+            </select>
+          </label>
+          <Field label="NYC address" value={form.address} onChange={set("address")} placeholder="200 Park Ave" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Employees" value={form.employees} onChange={set("employees")} placeholder="5000" />
+          <Field label="Funding / valuation" value={form.funding} onChange={set("funding")} placeholder="Series C" />
+        </div>
+        <label className="block text-xs text-gray-400">
+          Fit score — <span className="text-white">{form.fitScore}</span>
+          <input
+            type="range" min={0} max={100} step={5} value={form.fitScore}
+            onChange={set("fitScore")}
+            className="mt-1 w-full accent-accent"
+          />
+        </label>
+        <Field label="Source URL *" value={form.sourceUrl} onChange={set("sourceUrl")} placeholder="https://acme.com/about" />
+        <Field label="Key signal (optional)" value={form.signal} onChange={set("signal")} placeholder="Hiring 40 platform engineers in NYC" />
+        {error && <p className="text-xs text-rose-300">{error}</p>}
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-[11px] text-gray-600">* required — every record cites a source</span>
+          <button
+            onClick={submit}
+            disabled={saving || !form.name.trim() || !form.domain.trim() || !form.sourceUrl.trim()}
+            className="interactive rounded-lg border border-accent/40 bg-accent/15 px-4 py-1.5 text-sm font-medium text-accent-soft hover:bg-accent/25 disabled:opacity-40"
+          >
+            {saving ? "Adding…" : "Add company"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block text-xs text-gray-400">
+      {label}
+      <input
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className="interactive mt-1 w-full rounded-lg border border-white/10 bg-transparent px-2.5 py-1.5 text-sm text-gray-200 outline-none placeholder:text-gray-600 focus:border-accent/50"
+      />
+    </label>
   );
 }
