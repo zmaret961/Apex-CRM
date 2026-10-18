@@ -385,3 +385,15 @@ export function searchResearch(q: string, limit = 8): SearchHit[] {
     )
     .all(needle, needle, needle, limit) as SearchHit[];
 }
+
+export function pipelineCounts(): Record<string, number> {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT pipelineStage AS stage, COUNT(*) AS c FROM companies
+       WHERE discovered = 0 AND pipelineStage IS NOT NULL
+       GROUP BY pipelineStage`
+    )
+    .all() as { stage: string; c: number }[];
+  return Object.fromEntries(rows.map((r) => [r.stage, r.c]));
+}

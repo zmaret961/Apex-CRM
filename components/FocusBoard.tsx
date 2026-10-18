@@ -9,7 +9,17 @@ import clsx from "clsx";
 interface FocusData {
   items: FocusItem[];
   intel: IntelSummary;
+  pipeline: Record<string, number>;
 }
+
+const STAGE_ORDER = [
+  "Identified",
+  "Researched",
+  "Engaged",
+  "Demo Scheduled",
+  "Proposal",
+  "Closed Won",
+];
 
 const ACTION_TONE: Record<FocusItem["action"], string> = {
   "re-research": "border-amber-300/30 bg-amber-400/10 text-amber-300",
@@ -100,7 +110,26 @@ export default function FocusBoard() {
   const snoozedItems = (data?.items ?? []).filter((i) => snoozed.has(i.companyId));
 
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+    <div>
+      {data && (
+        <div className="glass mb-5 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-2xl px-4 py-2.5 text-xs">
+          <span className="font-semibold uppercase tracking-wider text-gray-500">
+            Pipeline
+          </span>
+          {STAGE_ORDER.map((s) => (
+            <span key={s} className="text-gray-400">
+              {s.replace("Closed ", "")}{" "}
+              <span className={clsx("font-medium", s === "Closed Won" ? "text-emerald-300" : "text-white")}>
+                {data.pipeline[s] ?? 0}
+              </span>
+            </span>
+          ))}
+          <span className="ml-auto text-gray-500">
+            {pending.length} suggestion{pending.length === 1 ? "" : "s"} open
+          </span>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
       <div className="space-y-3 lg:col-span-2">
         {!data && <div className="glass rounded-2xl p-8 text-center text-sm text-gray-500">Loading…</div>}
         {data && pending.length === 0 && (
@@ -241,6 +270,7 @@ export default function FocusBoard() {
       </div>
 
       <CompanyDrawer companyId={selected} onClose={() => setSelected(null)} />
+      </div>
     </div>
   );
 }
