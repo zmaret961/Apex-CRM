@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Company, CompanyEvent, PipelineStage, ResearchBrief } from "@/lib/types";
+import type { Company, CompanyEvent, FocusItem, PipelineStage, ResearchBrief } from "@/lib/types";
 import { PIPELINE_STAGES } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import FitScore from "./FitScore";
@@ -37,6 +37,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [note, setNote] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [suggestion, setSuggestion] = useState<FocusItem | null>(null);
+  const [acting, setActing] = useState(false);
 
   useEffect(() => {
     if (companyId == null) {
@@ -51,6 +53,13 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
         setBriefs(d.briefs ?? []);
         setEvents(d.events ?? []);
       });
+    fetch("/api/focus")
+      .then((r) => r.json())
+      .then((d) => {
+        const items: FocusItem[] = d.items ?? [];
+        setSuggestion(items.find((i) => i.companyId === companyId) ?? null);
+      })
+      .catch(() => setSuggestion(null));
   }, [companyId]);
 
   // Esc closes the drawer.
@@ -87,6 +96,27 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   async function removeFromPipeline() {
     await patch({ pipelineStage: null });
     onAdded?.();
+  }
+
+  async function runSuggestion() {
+    if (!company || !suggestion) return;
+    setActing(true);
+    if (suggestion.action === "advance" && suggestion.targetStage) {
+      await patch({ pipelineStage: suggestion.targetStage });
+      onAdded?.();
+    } else {
+      await fetch("/api/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "research", companyId: company.id }),
+      });
+      const d = await fetch(`/api/companies/${company.id}`).then((r) => r.json());
+      setCompany(d.company);
+      setBriefs(d.briefs ?? []);
+      setEvents(d.events ?? []);
+    }
+    setSuggestion(null);
+    setActing(false);
   }
 
   async function saveNote() {
@@ -184,6 +214,26 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 {copied ? "Copied ✓" : "Copy brief"}
               </button>
             </div>
+
+            {suggestion && (
+              <div className="animate-fade-up rounded-xl border border-accent/25 bg-accent/8 p-3.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-accent-soft">
+                    Suggested next
+                  </div>
+                  <button
+                    onClick={runSuggestion}
+                    disabled={acting}
+                    className="interactive rounded-lg border border-accent/40 bg-accent/15 px-2.5 py-1 text-xs font-medium text-accent-soft"
+                  >
+                    {acting ? "Working…" : suggestion.label}
+                  </button>
+                </div>
+                <p className="mt-1.5 text-xs leading-relaxed text-gray-400">
+                  {suggestion.reason}
+                </p>
+              </div>
+            )}
 
             <p className="text-sm leading-relaxed text-gray-300">{company.description}</p>
 
