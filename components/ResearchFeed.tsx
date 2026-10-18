@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { ResearchBrief } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import CompanyDrawer from "./CompanyDrawer";
@@ -23,6 +24,14 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
   const [category, setCategory] = useState("");
   const [q, setQ] = useState("");
   const [promoting, setPromoting] = useState<number | null>(null);
+
+  // Deep link: /research?q=<term> pre-fills the full-text filter
+  // (Focus competitive-surface 'feed' links land here).
+  const searchParams = useSearchParams();
+  const qParam = searchParams.get("q");
+  useEffect(() => {
+    if (qParam) setQ(qParam);
+  }, [qParam]);
 
   // Poll so new briefs appear while a sweep is running
   useEffect(() => {

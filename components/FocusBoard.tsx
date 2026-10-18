@@ -234,7 +234,15 @@ export default function FocusBoard() {
                   >
                     {t.tool} ↗
                   </a>
-                  <span className="text-xs text-gray-500">{t.mentions} mentions</span>
+                  <span className="flex items-center gap-2 text-xs text-gray-500">
+                    <a
+                      href={`/research?q=${encodeURIComponent(t.tool === "Claude Code" ? "claude" : t.tool.split(" ").pop()!.toLowerCase())}`}
+                      className="text-accent-soft/80 hover:text-accent-soft hover:underline"
+                    >
+                      feed
+                    </a>
+                    {t.mentions} mentions
+                  </span>
                 </div>
                 <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/5">
                   <div
@@ -259,8 +267,9 @@ export default function FocusBoard() {
           <h3 className="text-sm font-semibold text-white">How Focus works</h3>
           <p className="mt-2">
             Apex continuously scores your book and queues the highest-leverage next action —
-            refresh stale pipeline research, advance deals that are ready, and research top-fit
-            accounts with no brief on file.
+            refresh stale pipeline research, advance deals that are ready, re-engage stuck
+            deals, keep customer + competitor intel fresh, and research top-fit accounts with
+            no brief on file.
           </p>
           <p className="mt-2 text-gray-500">
             Actions run the real workflows: research writes a cited brief; advancing updates the

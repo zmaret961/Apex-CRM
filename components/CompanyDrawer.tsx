@@ -234,6 +234,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 {copied ? "Copied ✓" : "Copy brief"}
               </button>
             </div>
+            <p className="-mt-3 text-[11px] text-gray-500">{fitRationale(company)}</p>
 
             {suggestion && (
               <div className="animate-fade-up rounded-xl border border-accent/25 bg-accent/8 p-3.5">
@@ -483,6 +484,23 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
       </aside>
     </>
   );
+}
+
+const TARGET_VERTICALS = new Set([
+  "Finance", "Fintech", "Data Infrastructure", "Dev Tools", "Security", "AI / ML", "Enterprise Software",
+]);
+
+// Explains the fit score using only fields already on the record — a
+// derived rationale, not a factual claim, so no citation is needed.
+function fitRationale(c: Company): string {
+  const parts: string[] = [];
+  if (c.employees >= 10000) parts.push("very large eng org");
+  else if (c.employees >= 1000) parts.push("large eng org");
+  if (TARGET_VERTICALS.has(c.industry)) parts.push("target vertical");
+  if (c.signals.length >= 3) parts.push("rich public signals");
+  if (c.fitScore >= 85) parts.push("top-tier Devin fit");
+  else if (c.fitScore >= 60) parts.push("solid Devin fit");
+  return parts.length ? `Why ${c.fitScore}: ${parts.join(" · ")}` : "Limited public signals — fit is provisional.";
 }
 
 function nextStage(stage: PipelineStage): PipelineStage | null {
