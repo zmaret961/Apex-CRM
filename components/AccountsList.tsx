@@ -15,6 +15,7 @@ const INDUSTRIES = [
 
 export default function AccountsList() {
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [q, setQ] = useState("");
   const [industry, setIndustry] = useState("");
   const [status, setStatus] = useState("");
@@ -40,6 +41,7 @@ export default function AccountsList() {
           if (sort === "name") list.sort((a, b) => a.name.localeCompare(b.name));
           else if (sort === "employees") list.sort((a, b) => b.employees - a.employees);
           setCompanies(list);
+          setLoaded(true);
         });
     }, 180);
     return () => clearTimeout(t);
@@ -114,9 +116,16 @@ export default function AccountsList() {
         <span className="ml-auto text-xs text-gray-500">{companies.length} accounts</span>
       </div>
 
-      {companies.length === 0 && (
+      {loaded && companies.length === 0 && (
         <div className="glass rounded-2xl p-12 text-center text-sm text-gray-500">
           No accounts match these filters.
+        </div>
+      )}
+      {!loaded && (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="glass h-28 animate-pulse rounded-2xl" />
+          ))}
         </div>
       )}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">

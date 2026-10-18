@@ -184,8 +184,12 @@ function Column({
   );
 }
 
+function stageDays(ts: string): number {
+  return Math.max(0, Math.floor((Date.now() - new Date(ts + "Z").getTime()) / 86400000));
+}
+
 function daysAgo(ts: string): string {
-  const d = Math.max(0, Math.floor((Date.now() - new Date(ts + "Z").getTime()) / 86400000));
+  const d = stageDays(ts);
   return d === 0 ? "today" : `${d}d`;
 }
 
@@ -235,7 +239,18 @@ function Card({ company, overlay }: { company: Company; overlay?: boolean }) {
         <span className={company.estimatedValue ? "text-emerald-300" : "text-gray-400"}>
           {company.estimatedValue ?? `unconfirmed · fit ${company.fitScore}`}
         </span>
-        <span className="text-gray-600">
+        <span
+          className={
+            company.stageChangedAt && stageDays(company.stageChangedAt) > 30
+              ? "font-medium text-amber-300/80"
+              : "text-gray-600"
+          }
+          title={
+            company.stageChangedAt && stageDays(company.stageChangedAt) > 30
+              ? "Sitting in this stage over a month — check Focus for next steps"
+              : undefined
+          }
+        >
           {company.stageChangedAt
             ? `${daysAgo(company.stageChangedAt)} in stage`
             : company.lastResearchAt
