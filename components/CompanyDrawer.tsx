@@ -36,6 +36,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [added, setAdded] = useState(false);
   const [note, setNote] = useState("");
   const [savingNote, setSavingNote] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (companyId == null) {
@@ -97,6 +98,44 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setSavingNote(false);
   }
 
+  async function copyOutreachBrief() {
+    if (!company) return;
+    const lines: string[] = [
+      `# ${company.name} — outreach brief`,
+      ``,
+      `- Status: ${company.status}${company.pipelineStage ? ` / ${company.pipelineStage}` : ""}`,
+      `- Fit score: ${company.fitScore}/100`,
+      `- Industry: ${company.industry} · ${company.employees.toLocaleString()} employees`,
+      `- NYC office: ${company.address}`,
+      `- Site: https://${company.domain}`,
+      ``,
+      company.description,
+    ];
+    if (company.signals.length > 0) {
+      lines.push(``, `## Key signals`);
+      for (const s of company.signals) lines.push(`- ${s.text} (${s.source})`);
+    }
+    const brief = briefs[0];
+    if (brief) {
+      lines.push(``, `## Why now`, brief.whyNow, ``, `## Evidence`);
+      for (const c of brief.claims)
+        lines.push(`- [${c.category}] ${c.text}${c.sourceUrl ? ` (${c.sourceUrl})` : ""}`);
+    }
+    const text = lines.join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   const open = companyId != null;
 
   return (
@@ -137,6 +176,13 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
             <div className="flex items-center gap-3">
               <StatusPill status={company.status} />
               <FitScore score={company.fitScore} />
+              <button
+                onClick={copyOutreachBrief}
+                className="interactive ml-auto rounded-lg border border-white/10 px-2.5 py-1 text-xs text-gray-400 hover:border-accent/40 hover:text-white"
+                title="Copy a markdown outreach brief for this account"
+              >
+                {copied ? "Copied ✓" : "Copy brief"}
+              </button>
             </div>
 
             <p className="text-sm leading-relaxed text-gray-300">{company.description}</p>

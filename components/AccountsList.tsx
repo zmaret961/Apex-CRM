@@ -55,6 +55,7 @@ export default function AccountsList() {
         <select
           value={industry}
           onChange={(e) => setIndustry(e.target.value)}
+          aria-label="Filter by industry"
           className="interactive rounded-lg border border-white/10 bg-transparent px-2 py-1.5 text-sm text-gray-300 [&>option]:bg-base-900"
         >
           <option value="">All industries</option>
@@ -63,6 +64,7 @@ export default function AccountsList() {
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
+          aria-label="Filter by status"
           className="interactive rounded-lg border border-white/10 bg-transparent px-2 py-1.5 text-sm text-gray-300 [&>option]:bg-base-900"
         >
           <option value="">All statuses</option>
