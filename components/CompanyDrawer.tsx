@@ -168,7 +168,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
       ``,
       `- Status: ${company.status}${company.pipelineStage ? ` / ${company.pipelineStage}` : ""}`,
       `- Fit score: ${company.fitScore}/100`,
-      `- Industry: ${company.industry} · ${company.employees.toLocaleString()} employees`,
+      `- Industry: ${company.industry} · ${company.employees > 0 ? company.employees.toLocaleString() + " employees" : "size unconfirmed"}`,
       `- NYC office: ${company.address}`,
       `- Site: https://${company.domain}`,
       ``,
@@ -282,7 +282,10 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
 
             <div className="glass space-y-2 rounded-xl p-4 text-sm">
               <Row label="HQ / NYC office" value={company.address} />
-              <Row label="Employees" value={company.employees.toLocaleString()} />
+              <Row
+                label="Employees"
+                value={company.employees > 0 ? company.employees.toLocaleString() : "unconfirmed"}
+              />
               <Row label="Industry" value={company.industry} />
               <Row label="Funding" value={company.funding} />
               <div className="flex items-center justify-between gap-3">

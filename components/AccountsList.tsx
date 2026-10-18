@@ -186,7 +186,7 @@ export default function AccountsList() {
                   {c.name}
                 </div>
                 <div className="mt-0.5 text-xs text-gray-500">
-                  {c.industry} · {c.employees.toLocaleString()} employees
+                  {c.industry} · {c.employees > 0 ? `${c.employees.toLocaleString()} employees` : "size unconfirmed"}
                 </div>
               </div>
               <FitScore score={c.fitScore} />
