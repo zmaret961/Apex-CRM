@@ -226,7 +226,17 @@ export function recentLog(limit = 100): LogEntry[] {
 
 export function stats() {
   const db = getDb();
+  const sweep = db
+    .prepare(
+      `SELECT ts, message FROM activity_log
+       WHERE message LIKE 'Sweep % complete — %' ORDER BY id DESC LIMIT 1`
+    )
+    .get() as { ts: string; message: string } | undefined;
+  const lastSweep = sweep
+    ? { ts: sweep.ts, result: sweep.message.split("complete — ")[1] ?? sweep.message }
+    : null;
   return {
+    lastSweep,
     total: (db.prepare("SELECT COUNT(*) c FROM companies WHERE discovered = 0").get() as { c: number }).c,
     customers: (db.prepare("SELECT COUNT(*) c FROM companies WHERE status='customer' AND discovered=0").get() as { c: number }).c,
     prospects: (db.prepare("SELECT COUNT(*) c FROM companies WHERE status='prospect' AND discovered=0").get() as { c: number }).c,

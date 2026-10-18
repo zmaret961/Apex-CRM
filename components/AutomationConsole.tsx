@@ -14,7 +14,16 @@ interface AgentState {
     discovered: number;
     briefs: number;
     inPipeline: number;
+    lastSweep: { ts: string; result: string } | null;
   };
+}
+
+function ago(ts: string): string {
+  const s = Math.max(0, (Date.now() - new Date(ts.replace(" ", "T") + "Z").getTime()) / 1000);
+  if (s < 90) return `${Math.floor(s)}s ago`;
+  if (s < 5400) return `${Math.floor(s / 60)}m ago`;
+  if (s < 129600) return `${Math.floor(s / 3600)}h ago`;
+  return new Date(ts.replace(" ", "T") + "Z").toLocaleDateString();
 }
 
 export default function AutomationConsole() {
@@ -109,6 +118,14 @@ export default function AutomationConsole() {
             <Stat label="Customers" value={state.stats.customers} accent="text-emerald-300" />
             <Stat label="In pipeline" value={state.stats.inPipeline} accent="text-accent-soft" />
             <Stat label="Briefs" value={state.stats.briefs} accent="text-violet-300" />
+          </div>
+        )}
+
+        {state?.stats.lastSweep && (
+          <div className="glass rounded-2xl px-5 py-3 text-xs text-gray-400">
+            Last sweep:{" "}
+            <span className="text-gray-200">{state.stats.lastSweep.result}</span>
+            <span className="text-gray-600"> · {ago(state.stats.lastSweep.ts)}</span>
           </div>
         )}
 
