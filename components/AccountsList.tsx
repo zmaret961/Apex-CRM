@@ -95,6 +95,7 @@ export default function AccountsList() {
           <option value="customer">Customers</option>
           <option value="prospect">Prospects</option>
           <option value="researched">Researched</option>
+          <option value="competitor">Competitors</option>
         </select>
         <select
           value={sort}

@@ -1,4 +1,4 @@
-export type CompanyStatus = "customer" | "prospect" | "researched";
+export type CompanyStatus = "customer" | "prospect" | "researched" | "competitor";
 
 export const PIPELINE_STAGES = [
   "Identified",

@@ -15,6 +15,7 @@ export function getDb(): Database.Database {
   migrate(db);
   const count = (db.prepare("SELECT COUNT(*) as c FROM companies").get() as { c: number }).c;
   if (count === 0) seed(db);
+  applyDataMigrations(db);
   _db = db;
   return db;
 }
@@ -115,4 +116,42 @@ function seed(db: Database.Database) {
     }
   });
   tx();
+}
+
+// One-shot data migrations, versioned via PRAGMA user_version so existing
+// local databases pick up dataset corrections without a reseed.
+const COMPETITOR_DOMAINS = [
+  "openai.com", "anthropic.com", "microsoft.com", "google.com",
+];
+
+function applyDataMigrations(db: Database.Database) {
+  const v = (db.pragma("user_version") as { user_version: number }[])[0].user_version;
+  if (v < 1) {
+    const marks = COMPETITOR_DOMAINS.map(() => "?").join(",");
+    db.prepare(
+      `UPDATE companies SET status = 'competitor', pipelineStage = NULL
+       WHERE domain IN (${marks})`
+    ).run(...COMPETITOR_DOMAINS);
+    db.pragma("user_version = 1");
+  }
+  if (v < 2) {
+    // Newly added discovered companies join the auto-import queue without a
+    // full reseed (domains already present — imported or queued — are skipped).
+    const insert = db.prepare(
+      `INSERT INTO companies (name, domain, industry, address, lat, lng, employees, funding, status, fitScore, pipelineStage, estimatedValue, lastResearchAt, description, sources, signals, discovered)
+       SELECT @name, @domain, @industry, @address, @lat, @lng, @employees, @funding, @status, @fitScore, NULL, NULL, NULL, @description, @sources, @signals, 1
+       WHERE NOT EXISTS (SELECT 1 FROM companies WHERE domain = @domain)`
+    );
+    const tx = db.transaction(() => {
+      for (const c of DISCOVERED_COMPANIES) {
+        insert.run({
+          ...c,
+          sources: JSON.stringify(c.sources ?? []),
+          signals: JSON.stringify(c.signals ?? []),
+        });
+      }
+    });
+    tx();
+    db.pragma("user_version = 2");
+  }
 }

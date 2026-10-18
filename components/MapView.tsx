@@ -17,6 +17,7 @@ const STATUS_COLOR: Record<string, string> = {
   customer: "#34d399",
   prospect: "#60a5fa",
   researched: "#6b7280",
+  competitor: "#fb7185",
 };
 
 // Free CARTO dark basemap — no token required.
@@ -103,16 +104,6 @@ export default function MapView() {
     (e: maplibregl.MapLayerMouseEvent) => {
       const f = e.features?.[0];
       if (!f || !mapRef) return;
-      const clusterId = f.properties?.cluster_id;
-      if (clusterId != null) {
-        // Zoom into cluster
-        const source = mapRef.getMap().getSource("companies") as maplibregl.GeoJSONSource;
-        source.getClusterExpansionZoom(clusterId).then((zoom) => {
-          const [lng, lat] = (f.geometry as GeoJSON.Point).coordinates;
-          mapRef.easeTo({ center: [lng, lat], zoom: (zoom ?? 12) + 0.5, duration: 500 });
-        });
-        return;
-      }
       const id = f.properties?.id;
       if (id != null) setSelected(id);
     },
@@ -142,64 +133,54 @@ export default function MapView() {
         mapStyle={BASEMAP}
         initialViewState={{ longitude: -73.9857, latitude: 40.7280, zoom: 11.6 }}
         maxBounds={[[-76.5, 39.0], [-70.5, 42.5]]}
-        interactiveLayerIds={["clusters", "pins"]}
+        interactiveLayerIds={["pins", "pin-glow"]}
         onClick={onClick}
         onMouseMove={onMove}
         style={{ width: "100%", height: "100%" }}
       >
         <NavigationControl position="bottom-right" />
-        <Source
-          id="companies"
-          type="geojson"
-          data={geojson}
-          cluster
-          clusterMaxZoom={13}
-          clusterRadius={44}
-        >
-          {/* glow halo */}
+        <Source id="companies" type="geojson" data={geojson}>
+          {/* glow halo — dense areas naturally merge into a brighter zone */}
           <Layer
             id="pin-glow"
             type="circle"
-            filter={["!", ["has", "point_count"]]}
             paint={{
-              "circle-radius": 14,
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 7, 13, 12],
               "circle-color": ["get", "color"],
-              "circle-opacity": 0.28,
+              "circle-opacity": 0.30,
               "circle-blur": 1,
             }}
           />
+          {/* every company, always — no clustering */}
           <Layer
             id="pins"
             type="circle"
-            filter={["!", ["has", "point_count"]]}
             paint={{
-              "circle-radius": 6,
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 3.5, 13, 6],
               "circle-color": ["get", "color"],
-              "circle-stroke-width": 1.5,
-              "circle-stroke-color": "rgba(255,255,255,0.75)",
+              "circle-stroke-width": 1.25,
+              "circle-stroke-color": "rgba(255,255,255,0.7)",
             }}
           />
+          {/* names fade in as you zoom */}
           <Layer
-            id="clusters"
-            type="circle"
-            filter={["has", "point_count"]}
-            paint={{
-              "circle-radius": ["step", ["get", "point_count"], 16, 8, 20, 25, 26],
-              "circle-color": "rgba(109,141,255,0.35)",
-              "circle-stroke-width": 1,
-              "circle-stroke-color": "rgba(150,170,255,0.5)",
-            }}
-          />
-          <Layer
-            id="cluster-count"
+            id="pin-labels"
             type="symbol"
-            filter={["has", "point_count"]}
+            minzoom={12.3}
             layout={{
-              "text-field": "{point_count_abbreviated}",
-              "text-size": 12,
+              "text-field": ["get", "name"],
+              "text-size": 11,
               "text-font": ["Noto Sans Regular", "Arial Unicode MS Regular"],
+              "text-offset": [0, 1.15],
+              "text-anchor": "top",
+              "text-optional": true,
+              "text-allow-overlap": false,
             }}
-            paint={{ "text-color": "#e5e7ff" }}
+            paint={{
+              "text-color": "#dbe2ff",
+              "text-halo-color": "rgba(8,10,18,0.9)",
+              "text-halo-width": 1.4,
+            }}
           />
         </Source>
       </Map>
@@ -238,6 +219,7 @@ export default function MapView() {
           <option value="customer">Customers</option>
           <option value="prospect">Prospects</option>
           <option value="researched">Researched</option>
+          <option value="competitor">Competitors</option>
         </select>
         <label className="flex items-center gap-2 text-xs text-gray-400">
           Fit ≥ {minFit}

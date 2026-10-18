@@ -5,6 +5,7 @@ const MAP: Record<CompanyStatus, { label: string; cls: string }> = {
   customer: { label: "Customer", cls: "bg-emerald-400/15 text-emerald-300 border-emerald-300/30" },
   prospect: { label: "Prospect", cls: "bg-sky-400/15 text-sky-300 border-sky-300/30" },
   researched: { label: "Researched", cls: "bg-gray-400/10 text-gray-400 border-gray-400/20" },
+  competitor: { label: "Competitor", cls: "bg-rose-400/15 text-rose-300 border-rose-300/30" },
 };
 
 export default function StatusPill({ status }: { status: CompanyStatus }) {

@@ -13,7 +13,7 @@ import type {
   IntelSummary,
 } from "./types";
 
-export const VALID_STATUSES: CompanyStatus[] = ["customer", "prospect", "researched"];
+export const VALID_STATUSES: CompanyStatus[] = ["customer", "prospect", "researched", "competitor"];
 
 export function isPipelineStage(v: unknown): v is PipelineStage {
   return typeof v === "string" && (PIPELINE_STAGES as readonly string[]).includes(v);
@@ -216,7 +216,7 @@ export function suggestedActions(limit = 12): FocusItem[] {
   const stalePipeline = db
     .prepare(
       `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage FROM companies
-       WHERE discovered = 0 AND pipelineStage IS NOT NULL
+       WHERE discovered = 0 AND status != 'competitor' AND pipelineStage IS NOT NULL
          AND pipelineStage NOT IN ('Closed Won','Closed Lost')
          AND (lastResearchAt IS NULL OR lastResearchAt < datetime('now','-30 days'))
        ORDER BY fitScore DESC`
@@ -234,7 +234,7 @@ export function suggestedActions(limit = 12): FocusItem[] {
   const advanceable = db
     .prepare(
       `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage FROM companies
-       WHERE discovered = 0 AND pipelineStage IN ('Identified','Researched')
+       WHERE discovered = 0 AND status != 'competitor' AND pipelineStage IN ('Identified','Researched')
          AND lastResearchAt IS NOT NULL AND lastResearchAt >= datetime('now','-30 days')
        ORDER BY fitScore DESC`
     )
