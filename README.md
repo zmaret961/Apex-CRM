@@ -83,6 +83,10 @@ See `AGENTS.md` for the full rules.
   estimate; it logs to the timeline.
 - **Accounts** filters by any pipeline stage, open pipeline, or
   not-in-pipeline.
+- **Focus** flags **stuck deals** — 14+ days in Engaged/Demo/Proposal with
+  no stage movement raises a "Re-engage" item.
+- **Research search** is full-text: claims, categories, and summaries, with
+  matching claims previewed inline.
 
 ## Notes
 

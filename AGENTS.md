@@ -23,8 +23,9 @@ or Cognition-internal system involved. Everything runs on localhost.
 - `lib/db.ts` — better-sqlite3 singleton; creates schema and seeds on first
   open. `lib/queries.ts` — all reads/writes. `lib/research.ts` — deterministic
   brief synthesizer. `lib/agent.ts` — in-process research-sweep runner.
-- `app/api/*` — thin JSON routes over those libs (`/api/companies`,
-  `/api/companies/[id]`, `/api/research`, `/api/agent`, `/api/focus`).
+- `app/api/*` — thin JSON routes over those libs (`/api/companies`
+  (filters: q, industry, status, stage=open|none|<stage>), `/api/companies/[id]`,
+  `/api/research`, `/api/agent`, `/api/focus`, `/api/search`.
   Accounts exports the current filtered view to CSV client-side (no backend).
 - `app/page.tsx` = Map (index). `/focus`, `/accounts`, `/opportunities`,
   `/research`, `/automation`.
@@ -40,7 +41,9 @@ or Cognition-internal system involved. Everything runs on localhost.
 - `components/CommandPalette.tsx` — global ⌘K palette + single-key nav
   (mounted in `app/layout.tsx`).
 - `suggestedActions()` in `lib/queries.ts` — the next-best-action rules that
-  power Focus. `intelSummary()` aggregates competitor mentions.
+  power Focus: stale-pipeline refresh, advanceable deals, customer/competitor
+  intel refresh, stuck deals (14+d in an active stage), unresearched
+  top-fit prospects. `intelSummary()` aggregates competitor mentions.
 
 ## Data model (tables)
 - `companies` — name, domain, industry, address, lat/lng, employees, funding,
