@@ -306,6 +306,31 @@ export function suggestedActions(limit = 12): FocusItem[] {
     });
   }
 
+  // Deals parked in an active stage with no stage movement in 14+ days —
+  // the kanban badge shows the age; this puts a re-engage action in front
+  // of the seller.
+  const stuck = db
+    .prepare(
+      `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage,
+         (SELECT MAX(ts) FROM company_events e WHERE e.companyId = companies.id AND e.type = 'pipeline') AS stageChangedAt
+       FROM companies
+       WHERE discovered = 0 AND status != 'competitor'
+         AND pipelineStage IN ('Engaged','Demo Scheduled','Proposal')
+         AND COALESCE(stageChangedAt, '2000-01-01') < datetime('now','-14 days')
+       ORDER BY fitScore DESC LIMIT 3`
+    )
+    .all() as (Omit<FocusItem, "action" | "label" | "reason"> & { stageChangedAt: string | null })[];
+  for (const c of stuck) {
+    items.push({
+      ...c,
+      action: "re-research",
+      label: "Re-engage (stuck deal)",
+      reason: c.stageChangedAt
+        ? `${Math.max(1, Math.floor((Date.now() - new Date(c.stageChangedAt + "Z").getTime()) / 86400000))}d in ${c.pipelineStage} with no stage movement — a fresh signal gives you a reason to re-open the thread.`
+        : `In ${c.pipelineStage} with no recorded stage movement — a fresh signal gives you a reason to re-open the thread.`,
+    });
+  }
+
   const unresearched = db
     .prepare(
       `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage FROM companies
