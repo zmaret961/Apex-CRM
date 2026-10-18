@@ -108,7 +108,7 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
                   <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-gray-400">
                     {b.companyPipelineStage}
                   </span>
-                ) : (
+                ) : b.companyStatus === "customer" ? null : (
                   <button
                     onClick={() => promote(b)}
                     disabled={promoting === b.companyId}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Map, {
   Source,
   Layer,
@@ -48,15 +49,33 @@ export default function MapView() {
   }, [industry, status, minFit]);
 
   // Deep link: /?focus=<id> opens the company drawer and flies to its pin
-  // (used by the ⌘K palette and Focus page).
+  // (used by the ⌘K palette and Focus page). Re-runs when the URL changes,
+  // so ⌘K also works while already on the map.
+  const searchParams = useSearchParams();
+  const focusId = Number(searchParams.get("focus")) || null;
   useEffect(() => {
-    const id = Number(new URLSearchParams(window.location.search).get("focus"));
-    if (!id || !mapRef || companies.length === 0) return;
-    const c = companies.find((x) => x.id === id);
-    if (!c) return;
-    setSelected(id);
-    mapRef.easeTo({ center: [c.lng, c.lat], zoom: 13.5, duration: 900 });
-  }, [companies, mapRef]);
+    if (!focusId || !mapRef) return;
+    const fly = (c: { lng: number; lat: number }) =>
+      mapRef.easeTo({ center: [c.lng, c.lat], zoom: 13.5, duration: 900 });
+    const c = companies.find((x) => x.id === focusId);
+    if (c) {
+      setSelected(focusId);
+      fly(c);
+      return;
+    }
+    // The company may be hidden by the active filters — fetch it directly.
+    let cancelled = false;
+    fetch(`/api/companies/${focusId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled || !d.company) return;
+        setSelected(focusId);
+        fly(d.company);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [focusId, companies, mapRef]);
 
   const geojson = useMemo(
     () => ({

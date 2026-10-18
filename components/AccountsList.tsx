@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { Company } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import FitScore from "./FitScore";
@@ -21,10 +22,11 @@ export default function AccountsList() {
   const [selected, setSelected] = useState<number | null>(null);
 
   // Deep link: /accounts?open=<id> opens the shared company drawer.
+  const searchParams = useSearchParams();
+  const openId = Number(searchParams.get("open")) || null;
   useEffect(() => {
-    const id = Number(new URLSearchParams(window.location.search).get("open"));
-    if (id) setSelected(id);
-  }, []);
+    if (openId) setSelected(openId);
+  }, [openId]);
 
   useEffect(() => {
     const t = setTimeout(() => {
