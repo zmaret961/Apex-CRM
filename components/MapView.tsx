@@ -59,7 +59,11 @@ export default function MapView() {
   const searchParams = useSearchParams();
   const focusId = Number(searchParams.get("focus")) || null;
   useEffect(() => {
-    if (!focusId || !mapRef) return;
+    if (!focusId) {
+      setSelected(null);
+      return;
+    }
+    if (!mapRef) return;
     const fly = (c: { lng: number; lat: number }) =>
       mapRef.easeTo({ center: [c.lng, c.lat], zoom: 13.5, duration: 900 });
     const c = companies.find((x) => x.id === focusId);

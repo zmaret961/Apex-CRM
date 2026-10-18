@@ -28,6 +28,7 @@ export default function AccountsList() {
   const openId = Number(searchParams.get("open")) || null;
   useEffect(() => {
     if (openId) setSelected(openId);
+    else setSelected(null);
   }, [openId]);
 
   useEffect(() => {

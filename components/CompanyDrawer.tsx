@@ -42,6 +42,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [editingValue, setEditingValue] = useState(false);
   const [valueDraft, setValueDraft] = useState("");
   const [removedStage, setRemovedStage] = useState<PipelineStage | null>(null);
+  const [restoring, setRestoring] = useState(false);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -110,11 +111,13 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   }
 
   async function undoRemove() {
-    if (!removedStage) return;
+    if (!removedStage || restoring) return;
     if (undoTimer.current) clearTimeout(undoTimer.current);
     const stage = removedStage;
-    setRemovedStage(null);
+    setRestoring(true);
     await patch({ pipelineStage: stage });
+    setRestoring(false);
+    setRemovedStage(null);
     onAdded?.();
   }
 
@@ -294,7 +297,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                       setEditingValue(true);
                     }}
                     title="Click to set a deal estimate"
-                    className={`interactive rounded px-1 text-right ${
+                    className={`interactive -my-1 -mx-1 rounded px-2 py-1 text-right ${
                       company.estimatedValue ? "text-emerald-300" : "text-gray-500 hover:text-gray-300"
                     }`}
                   >
@@ -474,9 +477,10 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
             {company.pipelineStage == null && removedStage != null && (
               <button
                 onClick={undoRemove}
+                disabled={restoring}
                 className="interactive -mt-3 w-full rounded-xl border border-amber-400/30 bg-amber-400/10 py-2 text-xs font-medium text-amber-300 hover:bg-amber-400/20"
               >
-                Removed from pipeline — Undo (was {removedStage})
+                {restoring ? "Restoring…" : `Removed from pipeline — Undo (was ${removedStage})`}
               </button>
             )}
           </div>
