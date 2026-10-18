@@ -60,6 +60,21 @@ export default function KanbanBoard() {
     });
   }
 
+  async function advance(id: number) {
+    const company = companies.find((c) => c.id === id);
+    if (!company?.pipelineStage) return;
+    const idx = PIPELINE_STAGES.indexOf(company.pipelineStage);
+    const next = PIPELINE_STAGES[idx + 1];
+    if (!next) return;
+    const from = company.pipelineStage;
+    setCompanies((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, pipelineStage: next } : c))
+    );
+    await moveTo(id, next);
+    setToast({ id, name: company.name, from, to: next });
+    setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 6000);
+  }
+
   async function onDragEnd(e: DragEndEvent) {
     setActiveId(null);
     const id = Number(e.active.id);
@@ -107,6 +122,7 @@ export default function KanbanBoard() {
             stage={stage}
             items={byStage.get(stage) ?? []}
             onSelect={setSelected}
+            onAdvance={advance}
           />
         ))}
       </div>
@@ -140,10 +156,12 @@ function Column({
   stage,
   items,
   onSelect,
+  onAdvance,
 }: {
   stage: PipelineStage;
   items: Company[];
   onSelect: (id: number) => void;
+  onAdvance: (id: number) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage });
   const closed = stage.startsWith("Closed");
@@ -172,7 +190,7 @@ function Column({
       </div>
       <div className="space-y-2.5">
         {items.map((c) => (
-          <DraggableCard key={c.id} company={c} onSelect={onSelect} />
+          <DraggableCard key={c.id} company={c} onSelect={onSelect} onAdvance={onAdvance} />
         ))}
         {items.length === 0 && (
           <div className="rounded-xl border border-dashed border-white/10 p-4 text-center text-xs text-gray-600">
@@ -196,9 +214,11 @@ function daysAgo(ts: string): string {
 function DraggableCard({
   company,
   onSelect,
+  onAdvance,
 }: {
   company: Company;
   onSelect: (id: number) => void;
+  onAdvance: (id: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: company.id,
@@ -215,16 +235,28 @@ function DraggableCard({
       }}
       className="cursor-grab active:cursor-grabbing"
     >
-      <Card company={company} />
+      <Card company={company} onAdvance={onAdvance} />
     </div>
   );
 }
 
-function Card({ company, overlay }: { company: Company; overlay?: boolean }) {
+function Card({
+  company,
+  overlay,
+  onAdvance,
+}: {
+  company: Company;
+  overlay?: boolean;
+  onAdvance?: (id: number) => void;
+}) {
+  const canAdvance =
+    onAdvance &&
+    company.pipelineStage != null &&
+    !company.pipelineStage.startsWith("Closed");
   return (
     <div
       className={clsx(
-        "glass interactive rounded-xl p-3",
+        "group glass interactive rounded-xl p-3",
         overlay && "shadow-glow ring-1 ring-accent/50"
       )}
     >
@@ -233,7 +265,21 @@ function Card({ company, overlay }: { company: Company; overlay?: boolean }) {
           <div className="text-sm font-medium text-white">{company.name}</div>
           <div className="mt-0.5 text-xs text-gray-500">{company.industry}</div>
         </div>
-        <StatusPill status={company.status} />
+        <div className="flex items-center gap-1.5">
+          {canAdvance && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAdvance(company.id);
+              }}
+              title={`Advance to ${PIPELINE_STAGES[PIPELINE_STAGES.indexOf(company.pipelineStage!) + 1]}`}
+              className="interactive rounded-md border border-white/10 px-1.5 py-0.5 text-[11px] text-gray-500 opacity-0 transition-opacity hover:border-accent/40 hover:text-accent-soft group-hover:opacity-100"
+            >
+              →
+            </button>
+          )}
+          <StatusPill status={company.status} />
+        </div>
       </div>
       <div className="mt-2.5 flex items-center justify-between text-xs">
         <span className={company.estimatedValue ? "text-emerald-300" : "text-gray-400"}>
