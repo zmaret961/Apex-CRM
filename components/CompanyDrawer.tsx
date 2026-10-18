@@ -191,6 +191,15 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
 
   const open = companyId != null;
 
+  const researchAgeDays =
+    company?.lastResearchAt == null
+      ? null
+      : Math.floor(
+          (Date.now() -
+            new Date(company.lastResearchAt.replace(" ", "T") + "Z").getTime()) /
+            86400000
+        );
+
   return (
     <>
       {open && (
@@ -309,8 +318,13 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 label="Last research"
                 value={
                   company.lastResearchAt
-                    ? new Date(company.lastResearchAt).toLocaleDateString()
-                    : "Never"
+                    ? `${new Date(company.lastResearchAt.replace(" ", "T") + "Z").toLocaleDateString()}${
+                        researchAgeDays !== null && researchAgeDays > 30 ? " · stale" : ""
+                      }`
+                    : "Never — needs a brief"
+                }
+                valueClass={
+                  researchAgeDays === null || researchAgeDays > 30 ? "text-amber-300" : undefined
                 }
               />
             </div>
