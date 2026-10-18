@@ -27,8 +27,14 @@ or Cognition-internal system involved. Everything runs on localhost.
 - `app/page.tsx` = Map (index). `/focus`, `/accounts`, `/opportunities`,
   `/research`, `/automation`.
 - `components/CompanyDrawer.tsx` — the shared slide-over used by Map,
-  Accounts, Research, and Focus (deep links: `/?focus=<id>`,
-  `/accounts?open=<id>`).
+  Accounts, Research, Opportunities, and Focus (deep links: `/?focus=<id>`,
+  `/accounts?open=<id>` — both reactive via `useSearchParams`, so they also
+  work when already on the page). It hosts the activity timeline, notes,
+  stage advance/remove, and "Copy brief" (markdown outreach brief → clipboard).
+- `listBriefs()` joins `companyPipelineStage` so the feed can promote a
+  brief to the pipeline in one click (hidden for confirmed customers);
+  `listCompanies()` returns `stageChangedAt` (latest `pipeline` event ts)
+  which kanban cards render as "Nd in stage".
 - `components/CommandPalette.tsx` — global ⌘K palette + single-key nav
   (mounted in `app/layout.tsx`).
 - `suggestedActions()` in `lib/queries.ts` — the next-best-action rules that
