@@ -44,6 +44,9 @@ or Cognition-internal system involved. Everything runs on localhost.
   power Focus: stale-pipeline refresh, advanceable deals, customer/competitor
   intel refresh, stuck deals (14+d in an active stage), unresearched
   top-fit prospects. `intelSummary()` aggregates competitor mentions.
+  `weeklyDigest()` counts the last 7 days of company_events for the Focus
+  activity strip, which also hosts a one-click research-sweep button with
+  live progress (same job runner as Automation).
 
 ## Data model (tables)
 - `companies` — name, domain, industry, address, lat/lng, employees, funding,

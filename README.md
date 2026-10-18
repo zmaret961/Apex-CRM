@@ -87,6 +87,12 @@ See `AGENTS.md` for the full rules.
   no stage movement raises a "Re-engage" item.
 - **Research search** is full-text: claims, categories, and summaries, with
   matching claims previewed inline.
+- **Focus** shows a **7-day activity digest** (moves / briefs / imports) and
+  a **Run research sweep** button with live progress — the sweep queues
+  research for every stale or unresearched account in one click.
+- The auto-import queue now holds **65 enterprises** (banks, trading firms,
+  health systems, consultancies) — import them from Automation with
+  "Import queue".
 
 ## Notes
 
