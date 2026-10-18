@@ -109,3 +109,12 @@ export interface IntelSummary {
   tools: IntelTool[];
   competitorClaims: number;
 }
+
+export interface SearchHit {
+  companyId: number;
+  name: string;
+  status: CompanyStatus;
+  fitScore: number;
+  kind: "claim" | "brief";
+  snippet: string;
+}

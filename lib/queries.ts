@@ -2,6 +2,7 @@ import { getDb } from "./db";
 import { PIPELINE_STAGES } from "./types";
 import type {
   Company,
+  SearchHit,
   CompanyEvent,
   CompanyStatus,
   ResearchBrief,
@@ -358,4 +359,29 @@ function hydrate(row: RawCompany): Company {
     sources: JSON.parse(row.sources || "[]"),
     signals: JSON.parse(row.signals || "[]"),
   };
+}
+
+// Full-text-ish search across sourced research — surfaces which accounts'
+// research mentions a term (e.g. "Copilot", "hiring"). LIKE-escaped, capped.
+export function searchResearch(q: string, limit = 8): SearchHit[] {
+  const needle = `%${q.replace(/[%_\\]/g, (m) => "\\" + m)}%`;
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT c.id AS companyId, c.name, c.status, c.fitScore,
+              substr(cl.text, 1, 140) AS snippet, 'claim' AS kind
+       FROM research_claims cl
+       JOIN research_briefs rb ON rb.id = cl.briefId
+       JOIN companies c ON c.id = rb.companyId
+       WHERE cl.text LIKE ? ESCAPE '\\'
+       UNION ALL
+       SELECT c.id AS companyId, c.name, c.status, c.fitScore,
+              substr(rb.whyNow, 1, 140) AS snippet, 'brief' AS kind
+       FROM research_briefs rb
+       JOIN companies c ON c.id = rb.companyId
+       WHERE rb.whyNow LIKE ? ESCAPE '\\' OR rb.whatTheyDo LIKE ? ESCAPE '\\'
+       ORDER BY fitScore DESC
+       LIMIT ?`
+    )
+    .all(needle, needle, needle, limit) as SearchHit[];
 }
