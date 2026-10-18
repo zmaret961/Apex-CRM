@@ -22,6 +22,25 @@ const NAV: { id: string; label: string; href: string; key: string }[] = [
   { id: "nav-automation", label: "Go to Automation", href: "/automation", key: "u" },
 ];
 
+function exportCompaniesCsv(companies: Company[]) {
+  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const rows = [
+    ["name", "domain", "industry", "status", "pipelineStage", "fitScore", "employees", "funding", "estimatedValue", "address"],
+    ...companies.map((c) => [
+      c.name, c.domain, c.industry, c.status, c.pipelineStage ?? "", c.fitScore,
+      c.employees, c.funding, c.estimatedValue ?? "unconfirmed", c.address,
+    ]),
+  ];
+  const blob = new Blob([rows.map((r) => r.map(esc).join(",")).join("\n")], {
+    type: "text/csv",
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "apex-accounts.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 function isTypingTarget(t: EventTarget | null): boolean {
   return (
     t instanceof HTMLElement &&
@@ -82,6 +101,13 @@ export default function CommandPalette() {
         fetch("/api/agent", { method: "POST", body: "{}" });
         router.push("/automation");
       },
+    });
+    list.push({
+      id: "act-export",
+      kind: "action",
+      label: "Export accounts to CSV",
+      hint: "csv",
+      run: () => exportCompaniesCsv(companies),
     });
     if (q.trim()) {
       const needle = q.trim().toLowerCase();
