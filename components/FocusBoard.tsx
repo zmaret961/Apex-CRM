@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { FocusItem, IntelSummary } from "@/lib/types";
+import type { FocusItem, IntelSummary, JobStatus } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import CompanyDrawer from "./CompanyDrawer";
 import clsx from "clsx";
@@ -50,10 +50,40 @@ export default function FocusBoard() {
   const [snoozed, setSnoozed] = useState<Map<number, number>>(new Map());
   const [busy, setBusy] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
+  const [sweep, setSweep] = useState<JobStatus | null>(null);
 
   useEffect(() => {
     setSnoozed(loadSnoozed());
+    // Reflect a sweep already running (e.g. started from Automation).
+    fetch("/api/agent")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.job?.running) setSweep(d.job);
+      })
+      .catch(() => {});
   }, []);
+
+  async function startSweep() {
+    const d = await fetch("/api/agent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    }).then((r) => r.json());
+    if (d.job) setSweep(d.job);
+  }
+
+  // Poll a running sweep; refresh the board when it finishes.
+  useEffect(() => {
+    if (!sweep?.running) return;
+    const t = setInterval(async () => {
+      const d = await fetch(`/api/agent?jobId=${sweep.jobId}`).then((r) => r.json());
+      setSweep(d.job ?? null);
+      // job is null after completion (pruned) — refresh either way.
+      if (!d.job || !d.job.running) load();
+    }, 2000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sweep?.jobId, sweep?.running]);
 
   function snooze(id: number) {
     const until = Date.now() + SNOOZE_DAYS * 86400000;
@@ -124,7 +154,20 @@ export default function FocusBoard() {
               </span>
             </span>
           ))}
-          <span className="ml-auto text-gray-500">
+          <span className="ml-auto flex items-center gap-3 text-gray-500">
+            {sweep?.running ? (
+              <span className="text-violet-300">
+                Sweep running · {sweep.done}/{sweep.total}
+              </span>
+            ) : (
+              <button
+                onClick={startSweep}
+                className="interactive rounded-lg border border-violet-300/30 bg-violet-400/10 px-2.5 py-1 text-[11px] font-medium text-violet-300 hover:bg-violet-400/20"
+                title="Queue research for every stale or unresearched account"
+              >
+                Run research sweep
+              </button>
+            )}
             {pending.length} suggestion{pending.length === 1 ? "" : "s"} open
           </span>
         </div>
