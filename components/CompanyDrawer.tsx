@@ -235,6 +235,12 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 >
                   {company.domain} ↗
                 </a>
+                <a
+                  href={`/?focus=${company.id}`}
+                  className="mt-0.5 block text-xs text-gray-500 hover:text-accent-soft"
+                >
+                  View on map ↗
+                </a>
               </div>
               <button
                 onClick={onClose}

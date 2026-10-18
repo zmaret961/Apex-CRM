@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Company, JobStatus, LogEntry } from "@/lib/types";
+import CompanyDrawer from "./CompanyDrawer";
 import clsx from "clsx";
 
 interface AgentState {
@@ -30,6 +31,7 @@ export default function AutomationConsole() {
   const [state, setState] = useState<AgentState | null>(null);
   const [importing, setImporting] = useState(false);
   const [discovered, setDiscovered] = useState<Company[]>([]);
+  const [selected, setSelected] = useState<number | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   async function poll() {
@@ -95,9 +97,15 @@ export default function AutomationConsole() {
             <>
               <ul className="mt-3 space-y-1 text-xs text-gray-500">
                 {discovered.slice(0, 10).map((c) => (
-                  <li key={c.id} className="truncate">
-                    <span className="text-gray-300">{c.name}</span>
-                    <span className="text-gray-600"> · {c.industry} · fit {c.fitScore}</span>
+                  <li key={c.id}>
+                    <button
+                      onClick={() => setSelected(c.id)}
+                      title="Preview before importing"
+                      className="interactive -mx-1 w-full truncate rounded px-1 text-left hover:bg-white/5"
+                    >
+                      <span className="text-gray-300 hover:text-accent-soft">{c.name}</span>
+                      <span className="text-gray-600"> · {c.industry} · fit {c.fitScore}</span>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -203,6 +211,7 @@ export default function AutomationConsole() {
           )}
         </div>
       </div>
+      <CompanyDrawer companyId={selected} onClose={() => setSelected(null)} onAdded={poll} />
     </div>
   );
 }
