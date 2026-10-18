@@ -26,6 +26,7 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
   // Poll so new briefs appear while a sweep is running
   useEffect(() => {
     const t = setInterval(() => {
+      if (document.hidden) return;
       fetch("/api/research").then((r) => r.json()).then(setBriefs);
     }, 3000);
     return () => clearInterval(t);

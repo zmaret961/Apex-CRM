@@ -30,27 +30,32 @@ export function listCompanies(opts: {
   discovered?: boolean;
 }): Company[] {
   const db = getDb();
-  const where: string[] = ["discovered = ?"];
+  const where: string[] = ["c.discovered = ?"];
   const args: unknown[] = [opts.discovered ? 1 : 0];
   if (opts.q) {
-    where.push("(name LIKE ? OR domain LIKE ? OR description LIKE ?)");
+    where.push("(c.name LIKE ? OR c.domain LIKE ? OR c.description LIKE ?)");
     const q = `%${opts.q}%`;
     args.push(q, q, q);
   }
   if (opts.industry) {
-    where.push("industry = ?");
+    where.push("c.industry = ?");
     args.push(opts.industry);
   }
   if (opts.status) {
-    where.push("status = ?");
+    where.push("c.status = ?");
     args.push(opts.status);
   }
   if (opts.minFit != null) {
-    where.push("fitScore >= ?");
+    where.push("c.fitScore >= ?");
     args.push(opts.minFit);
   }
   const rows = db
-    .prepare(`SELECT * FROM companies WHERE ${where.join(" AND ")} ORDER BY fitScore DESC`)
+    .prepare(
+      `SELECT c.*,
+         (SELECT MAX(ce.ts) FROM company_events ce
+           WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt
+       FROM companies c WHERE ${where.join(" AND ")} ORDER BY c.fitScore DESC`
+    )
     .all(...args) as RawCompany[];
   return rows.map(hydrate);
 }
@@ -243,6 +248,24 @@ export function suggestedActions(limit = 12): FocusItem[] {
         target === "Researched"
           ? "Fresh research is on file — mark it researched so the board stays honest."
           : "Researched and sourced — time for outreach before the signal goes cold.",
+    });
+  }
+
+  const customers = db
+    .prepare(
+      `SELECT id, name, status, fitScore, industry, pipelineStage FROM companies
+       WHERE discovered = 0 AND status = 'customer'
+         AND (lastResearchAt IS NULL OR lastResearchAt < datetime('now','-45 days'))
+       ORDER BY fitScore DESC LIMIT 3`
+    )
+    .all() as Omit<FocusItem, "action" | "label" | "reason">[];
+  for (const c of customers) {
+    items.push({
+      ...c,
+      action: "re-research",
+      label: "Refresh customer intel",
+      reason:
+        "Existing Devin customer with stale intel — look for the next expansion team before your check-in.",
     });
   }
 

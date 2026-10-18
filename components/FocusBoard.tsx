@@ -66,7 +66,7 @@ export default function FocusBoard() {
           </div>
         )}
         {pending.map((item) => (
-          <div key={item.companyId} className="glass animate-fade-up flex items-center gap-4 rounded-2xl p-4">
+          <div key={`pending-${item.companyId}`} className="glass animate-fade-up flex items-center gap-4 rounded-2xl p-4">
             <button
               onClick={() => setSelected(item.companyId)}
               className="min-w-0 flex-1 text-left"
@@ -98,7 +98,7 @@ export default function FocusBoard() {
         ))}
         {completed.map((item) => (
           <div
-            key={item.companyId}
+            key={`done-${item.companyId}`}
             className="glass flex items-center gap-4 rounded-2xl p-4 opacity-45"
           >
             <div className="min-w-0 flex-1">

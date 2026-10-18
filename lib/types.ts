@@ -36,6 +36,7 @@ export interface Company {
   sources: string[];
   signals: Signal[];
   discovered: number; // 0 = in accounts, 1 = discovered-not-yet-imported
+  stageChangedAt?: string | null; // ts of last pipeline move (from company_events)
 }
 
 export interface Claim {

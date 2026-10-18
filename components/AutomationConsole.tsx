@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { JobStatus, LogEntry } from "@/lib/types";
+import type { Company, JobStatus, LogEntry } from "@/lib/types";
 import clsx from "clsx";
 
 interface AgentState {
@@ -20,11 +20,19 @@ interface AgentState {
 export default function AutomationConsole() {
   const [state, setState] = useState<AgentState | null>(null);
   const [importing, setImporting] = useState(false);
+  const [discovered, setDiscovered] = useState<Company[]>([]);
   const logRef = useRef<HTMLDivElement>(null);
 
   async function poll() {
+    if (document.hidden) return;
     const data = await fetch("/api/agent").then((r) => r.json());
     setState(data);
+    const n = data?.stats?.discovered ?? 0;
+    if (n > 0) {
+      fetch("/api/companies?discovered=1").then((r) => r.json()).then(setDiscovered);
+    } else {
+      setDiscovered((prev) => (prev.length ? [] : prev));
+    }
     return data;
   }
 
@@ -32,6 +40,7 @@ export default function AutomationConsole() {
     poll();
     const t = setInterval(poll, 1500);
     return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -74,13 +83,23 @@ export default function AutomationConsole() {
             {running ? "Sweep running…" : "Run research sweep"}
           </button>
           {state && state.stats.discovered > 0 && (
-            <button
-              onClick={importAll}
-              disabled={importing}
-              className="interactive mt-2 w-full rounded-xl border border-emerald-400/30 bg-emerald-400/10 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-400/20"
-            >
-              {importing ? "Importing…" : `Import ${state.stats.discovered} discovered enterprises`}
-            </button>
+            <>
+              <ul className="mt-3 space-y-1 text-xs text-gray-500">
+                {discovered.slice(0, 10).map((c) => (
+                  <li key={c.id} className="truncate">
+                    <span className="text-gray-300">{c.name}</span>
+                    <span className="text-gray-600"> · {c.industry} · fit {c.fitScore}</span>
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={importAll}
+                disabled={importing}
+                className="interactive mt-2 w-full rounded-xl border border-emerald-400/30 bg-emerald-400/10 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-400/20"
+              >
+                {importing ? "Importing…" : `Import ${state.stats.discovered} discovered enterprises`}
+              </button>
+            </>
           )}
         </div>
 

@@ -137,6 +137,11 @@ function Column({
   );
 }
 
+function daysAgo(ts: string): string {
+  const d = Math.max(0, Math.floor((Date.now() - new Date(ts + "Z").getTime()) / 86400000));
+  return d === 0 ? "today" : `${d}d`;
+}
+
 function DraggableCard({
   company,
   onSelect,
@@ -184,7 +189,9 @@ function Card({ company, overlay }: { company: Company; overlay?: boolean }) {
           {company.estimatedValue ?? `unconfirmed · fit ${company.fitScore}`}
         </span>
         <span className="text-gray-600">
-          {company.lastResearchAt
+          {company.stageChangedAt
+            ? `${daysAgo(company.stageChangedAt)} in stage`
+            : company.lastResearchAt
             ? `researched ${new Date(company.lastResearchAt).toLocaleDateString()}`
             : "unresearched"}
         </span>
