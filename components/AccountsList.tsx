@@ -31,6 +31,25 @@ export default function AccountsList() {
     else setSelected(null);
   }, [openId]);
 
+  // While the drawer is open, ↑/↓ steps through the current filtered list —
+  // a seller can review a whole territory without touching the mouse.
+  useEffect(() => {
+    if (selected == null) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      const el = e.target as HTMLElement;
+      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable) return;
+      const idx = companies.findIndex((c) => c.id === selected);
+      if (idx < 0) return;
+      const next = e.key === "ArrowDown" ? idx + 1 : idx - 1;
+      if (next < 0 || next >= companies.length) return;
+      e.preventDefault();
+      setSelected(companies[next].id);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selected, companies]);
+
   useEffect(() => {
     const t = setTimeout(() => {
       const p = new URLSearchParams();
@@ -128,7 +147,10 @@ export default function AccountsList() {
         >
           Export CSV
         </button>
-        <span className="ml-auto text-xs text-gray-500">{companies.length} accounts</span>
+        <span className="ml-auto text-xs text-gray-500">
+          {companies.length} accounts
+          {selected != null && <span className="text-gray-600"> · ↑↓ steps through profiles</span>}
+        </span>
       </div>
 
       {loaded && companies.length === 0 && (
