@@ -453,6 +453,23 @@ export function searchResearch(q: string, limit = 8): SearchHit[] {
     .all(needle, needle, needle, limit) as SearchHit[];
 }
 
+export function weeklyDigest() {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT type, COUNT(*) AS c FROM company_events
+       WHERE ts > datetime('now', '-7 days') GROUP BY type`
+    )
+    .all() as { type: string; c: number }[];
+  const by = Object.fromEntries(rows.map((r) => [r.type, r.c]));
+  return {
+    pipelineMoves: (by.pipeline as number) ?? 0,
+    researchRuns: (by.research as number) ?? 0,
+    imports: (by.import as number) ?? 0,
+    notes: (by.note as number) ?? 0,
+  };
+}
+
 export function pipelineCounts(): Record<string, number> {
   const db = getDb();
   const rows = db

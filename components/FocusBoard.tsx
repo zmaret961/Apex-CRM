@@ -10,6 +10,7 @@ interface FocusData {
   items: FocusItem[];
   intel: IntelSummary;
   pipeline: Record<string, number>;
+  digest: { pipelineMoves: number; researchRuns: number; imports: number; notes: number };
 }
 
 const STAGE_ORDER = [
@@ -154,6 +155,13 @@ export default function FocusBoard() {
               </span>
             </span>
           ))}
+          {(data.digest.pipelineMoves + data.digest.researchRuns + data.digest.imports) > 0 && (
+            <span className="text-gray-500" title="Activity in the last 7 days">
+              7d: {data.digest.pipelineMoves} move{data.digest.pipelineMoves === 1 ? "" : "s"}
+              {" · "}{data.digest.researchRuns} brief{data.digest.researchRuns === 1 ? "" : "s"}
+              {" · "}{data.digest.imports} import{data.digest.imports === 1 ? "" : "s"}
+            </span>
+          )}
           <span className="ml-auto flex items-center gap-3 text-gray-500">
             {sweep?.running ? (
               <span className="text-violet-300">
