@@ -153,8 +153,8 @@ function Card({ company, overlay }: { company: Company; overlay?: boolean }) {
         <StatusPill status={company.status} />
       </div>
       <div className="mt-2.5 flex items-center justify-between text-xs">
-        <span className="text-gray-400">
-          {company.estimatedValue ?? `fit ${company.fitScore}`}
+        <span className={company.estimatedValue ? "text-emerald-300" : "text-gray-400"}>
+          {company.estimatedValue ?? `unconfirmed · fit ${company.fitScore}`}
         </span>
         <span className="text-gray-600">
           {company.lastResearchAt

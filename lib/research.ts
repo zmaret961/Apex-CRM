@@ -1,5 +1,5 @@
 import { getDb } from "./db";
-import { insertBrief, markResearched, log } from "./queries";
+import { addEvent, insertBrief, markResearched, log } from "./queries";
 import type { Company } from "./types";
 
 // Deterministic research synthesizer. Composes a structured brief from a
@@ -75,6 +75,7 @@ export function runResearchOn(companyId: number, jobId: string): boolean {
   const brief = generateBrief(company);
   insertBrief(companyId, brief.whatTheyDo, brief.whyNow, brief.claims);
   markResearched(companyId);
+  addEvent(companyId, "research", `Research brief published (${brief.claims.length} cited claims)`);
   log(jobId, "success", `Research brief published for ${company.name} (${brief.claims.length} cited claims)`);
   return true;
 }

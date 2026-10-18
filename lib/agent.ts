@@ -18,6 +18,12 @@ interface Job {
 
 const jobs = new Map<string, Job>();
 let jobCounter = 0;
+const MAX_JOBS = 25;
+
+export function runningJob(): JobStatus | null {
+  for (const job of jobs.values()) if (job.running) return status(job);
+  return null;
+}
 
 export function startSweep(staleDays = 30): JobStatus {
   const db = getDb();
@@ -39,6 +45,10 @@ export function startSweep(staleDays = 30): JobStatus {
     failed: 0,
   };
   jobs.set(jobId, job);
+  if (jobs.size > MAX_JOBS) {
+    const oldest = jobs.keys().next().value;
+    if (oldest && oldest !== jobId) jobs.delete(oldest);
+  }
 
   log(jobId, "info", `Research sweep ${jobId} started — ${rows.length} accounts queued`);
   scheduleNext(job);
@@ -77,6 +87,13 @@ export function latestJob(): JobStatus | null {
   const all = [...jobs.values()];
   const last = all[all.length - 1];
   return last ? status(last) : null;
+}
+
+// Single-account research run, used by the Focus page's "Research now" action.
+export function researchNow(companyId: number): boolean {
+  const jobId = `manual-${Date.now().toString(36)}`;
+  log(jobId, "info", "Manual research run started");
+  return runResearchOn(companyId, jobId);
 }
 
 function status(job: Job): JobStatus {

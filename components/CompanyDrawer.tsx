@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Company, ResearchBrief } from "@/lib/types";
+import type { Company, CompanyEvent, ResearchBrief } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import FitScore from "./FitScore";
 
@@ -11,11 +11,30 @@ interface Props {
   onAdded?: () => void;
 }
 
+const EVENT_TONE: Record<CompanyEvent["type"], string> = {
+  pipeline: "text-accent-soft",
+  research: "text-violet-300",
+  note: "text-amber-300",
+  status: "text-emerald-300",
+  import: "text-cyan-300",
+};
+
+const EVENT_LABEL: Record<CompanyEvent["type"], string> = {
+  pipeline: "Pipeline",
+  research: "Research",
+  note: "Note",
+  status: "Status",
+  import: "Import",
+};
+
 export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [company, setCompany] = useState<Company | null>(null);
   const [briefs, setBriefs] = useState<ResearchBrief[]>([]);
+  const [events, setEvents] = useState<CompanyEvent[]>([]);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
+  const [note, setNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
 
   useEffect(() => {
     if (companyId == null) {
@@ -28,20 +47,53 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
       .then((d) => {
         setCompany(d.company);
         setBriefs(d.briefs ?? []);
+        setEvents(d.events ?? []);
       });
   }, [companyId]);
+
+  // Esc closes the drawer.
+  useEffect(() => {
+    if (companyId == null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [companyId, onClose]);
+
+  async function patch(body: Record<string, unknown>) {
+    if (!company) return;
+    await fetch(`/api/companies/${company.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const d = await fetch(`/api/companies/${company.id}`).then((r) => r.json());
+    setCompany(d.company);
+    setEvents(d.events ?? []);
+  }
 
   async function addToPipeline() {
     if (!company) return;
     setAdding(true);
-    await fetch(`/api/companies/${company.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pipelineStage: "Identified" }),
-    });
+    await patch({ pipelineStage: "Identified" });
     setAdding(false);
     setAdded(true);
     onAdded?.();
+  }
+
+  async function removeFromPipeline() {
+    await patch({ pipelineStage: null });
+    onAdded?.();
+  }
+
+  async function saveNote() {
+    const text = note.trim();
+    if (!text || !company) return;
+    setSavingNote(true);
+    await patch({ note: text });
+    setNote("");
+    setSavingNote(false);
   }
 
   const open = companyId != null;
@@ -66,6 +118,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 <a
                   href={`https://${company.domain}`}
                   target="_blank"
+                  rel="noreferrer"
                   className="text-sm text-accent-soft hover:underline"
                 >
                   {company.domain} ↗
@@ -73,6 +126,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
               </div>
               <button
                 onClick={onClose}
+                aria-label="Close"
                 className="interactive rounded-lg border border-white/10 px-2.5 py-1 text-gray-400 hover:text-white"
               >
                 ✕
@@ -91,13 +145,11 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
               <Row label="Employees" value={company.employees.toLocaleString()} />
               <Row label="Industry" value={company.industry} />
               <Row label="Funding" value={company.funding} />
-              {company.estimatedValue && (
-                <Row
-                  label="Deal value"
-                  value={company.estimatedValue}
-                  valueClass="text-emerald-300"
-                />
-              )}
+              <Row
+                label="Deal value"
+                value={company.estimatedValue ?? "unconfirmed"}
+                valueClass={company.estimatedValue ? "text-emerald-300" : "text-gray-500"}
+              />
               <Row
                 label="Last research"
                 value={
@@ -120,6 +172,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                       <a
                         href={s.source}
                         target="_blank"
+                        rel="noreferrer"
                         className="ml-2 text-accent-soft hover:underline"
                       >
                         source ↗
@@ -147,7 +200,12 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                           {c.category}
                         </span>
                         {c.sourceUrl && (
-                          <a href={c.sourceUrl} target="_blank" className="shrink-0 text-accent-soft hover:underline">
+                          <a
+                            href={c.sourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="shrink-0 text-accent-soft hover:underline"
+                          >
                             source ↗
                           </a>
                         )}
@@ -158,6 +216,48 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
               </section>
             )}
 
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                Activity
+              </h3>
+              <div className="glass max-h-52 space-y-2 overflow-y-auto rounded-xl p-4">
+                {events.length === 0 && (
+                  <p className="text-sm text-gray-600">No activity yet.</p>
+                )}
+                {events.map((e) => (
+                  <div key={e.id} className="flex gap-3 text-sm">
+                    <span
+                      className={`mt-0.5 shrink-0 text-[10px] font-medium uppercase tracking-wide ${EVENT_TONE[e.type]}`}
+                    >
+                      {EVENT_LABEL[e.type]}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="leading-snug text-gray-300">{e.text}</p>
+                      <p className="text-[11px] text-gray-600">
+                        {new Date(e.ts + "Z").toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <input
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && saveNote()}
+                  placeholder="Add a note — call outcome, next step…"
+                  className="interactive flex-1 rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-sm outline-none placeholder:text-gray-600 focus:border-accent/50"
+                />
+                <button
+                  onClick={saveNote}
+                  disabled={!note.trim() || savingNote}
+                  className="interactive rounded-lg border border-white/10 px-3 py-1.5 text-sm text-gray-300 hover:text-white disabled:opacity-40"
+                >
+                  {savingNote ? "…" : "Save"}
+                </button>
+              </div>
+            </section>
+
             {company.sources.length > 0 && (
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
@@ -166,8 +266,13 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 <ul className="space-y-1 text-sm">
                   {company.sources.map((s) => (
                     <li key={s}>
-                      <a href={s} target="_blank" className="text-accent-soft hover:underline">
-                        {new URL(s).hostname} ↗
+                      <a
+                        href={s}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-accent-soft hover:underline"
+                      >
+                        {hostname(s)} ↗
                       </a>
                     </li>
                   ))}
@@ -188,6 +293,14 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 ? "Adding…"
                 : "Add to Opportunities"}
             </button>
+            {company.pipelineStage != null && (
+              <button
+                onClick={removeFromPipeline}
+                className="interactive -mt-3 w-full rounded-xl border border-white/10 py-2 text-xs text-gray-500 hover:border-rose-400/30 hover:text-rose-300"
+              >
+                Remove from pipeline
+              </button>
+            )}
           </div>
         )}
       </aside>
@@ -195,11 +308,19 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   );
 }
 
+function hostname(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
 function Row({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
   return (
     <div className="flex justify-between gap-4">
-      <span className="text-gray-500">{label}</span>
-      <span className={valueClass ?? "text-gray-200"}>{value}</span>
+      <span className="shrink-0 text-gray-500">{label}</span>
+      <span className={`${valueClass ?? "text-gray-200"} text-right`}>{value}</span>
     </div>
   );
 }

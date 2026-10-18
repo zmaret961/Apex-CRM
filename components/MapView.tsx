@@ -47,6 +47,17 @@ export default function MapView() {
       .then(setCompanies);
   }, [industry, status, minFit]);
 
+  // Deep link: /?focus=<id> opens the company drawer and flies to its pin
+  // (used by the ⌘K palette and Focus page).
+  useEffect(() => {
+    const id = Number(new URLSearchParams(window.location.search).get("focus"));
+    if (!id || !mapRef || companies.length === 0) return;
+    const c = companies.find((x) => x.id === id);
+    if (!c) return;
+    setSelected(id);
+    mapRef.easeTo({ center: [c.lng, c.lat], zoom: 13.5, duration: 900 });
+  }, [companies, mapRef]);
+
   const geojson = useMemo(
     () => ({
       type: "FeatureCollection" as const,
@@ -225,7 +236,14 @@ export default function MapView() {
         <Legend color="#6b7280" label="Researched / low-fit" />
       </div>
 
-      <CompanyDrawer companyId={selected} onClose={() => setSelected(null)} />
+      <CompanyDrawer
+        companyId={selected}
+        onClose={() => setSelected(null)}
+        onAdded={() => {
+          // Refresh pins so pin state reflects pipeline changes immediately.
+          fetch("/api/companies").then((r) => r.json()).then(setCompanies);
+        }}
+      />
     </div>
   );
 }

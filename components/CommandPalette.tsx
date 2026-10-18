@@ -1,0 +1,205 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { Company } from "@/lib/types";
+import StatusPill from "./StatusPill";
+
+interface Action {
+  id: string;
+  kind: "nav" | "action" | "company";
+  label: string;
+  hint?: string;
+  run: () => void;
+}
+
+const NAV: { id: string; label: string; href: string; key: string }[] = [
+  { id: "nav-map", label: "Go to Map", href: "/", key: "m" },
+  { id: "nav-focus", label: "Go to Focus", href: "/focus", key: "f" },
+  { id: "nav-opps", label: "Go to Opportunities", href: "/opportunities", key: "o" },
+  { id: "nav-accounts", label: "Go to Accounts", href: "/accounts", key: "a" },
+  { id: "nav-research", label: "Go to Research", href: "/research", key: "r" },
+  { id: "nav-automation", label: "Go to Automation", href: "/automation", key: "u" },
+];
+
+function isTypingTarget(t: EventTarget | null): boolean {
+  return (
+    t instanceof HTMLElement &&
+    (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)
+  );
+}
+
+export default function CommandPalette() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [cursor, setCursor] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Global keys: ⌘K / Ctrl-K toggles the palette; single letters navigate.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setOpen((v) => !v);
+        return;
+      }
+      if (isTypingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      const nav = NAV.find((n) => n.key === e.key.toLowerCase());
+      if (nav && !open) router.push(nav.href);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, router]);
+
+  // Load company list lazily on first open.
+  useEffect(() => {
+    if (!open) return;
+    setQ("");
+    setCursor(0);
+    inputRef.current?.focus();
+    if (companies.length === 0) {
+      fetch("/api/companies").then((r) => r.json()).then(setCompanies);
+    }
+  }, [open, companies.length]);
+
+  const actions = useMemo<Action[]>(() => {
+    const list: Action[] = NAV.map((n) => ({
+      id: n.id,
+      kind: "nav",
+      label: n.label,
+      hint: n.key,
+      run: () => router.push(n.href),
+    }));
+    list.push({
+      id: "act-sweep",
+      kind: "action",
+      label: "Run research sweep",
+      hint: "agent",
+      run: () => {
+        fetch("/api/agent", { method: "POST", body: "{}" });
+        router.push("/automation");
+      },
+    });
+    if (q.trim()) {
+      const needle = q.trim().toLowerCase();
+      const hits = companies
+        .filter(
+          (c) =>
+            c.name.toLowerCase().includes(needle) ||
+            c.domain.toLowerCase().includes(needle) ||
+            c.industry.toLowerCase().includes(needle)
+        )
+        .slice(0, 7);
+      for (const c of hits) {
+        list.push({
+          id: `co-${c.id}`,
+          kind: "company",
+          label: c.name,
+          hint: `${c.industry} · fit ${c.fitScore}`,
+          run: () => router.push(`/?focus=${c.id}`),
+        });
+      }
+    }
+    return list;
+  }, [q, companies, router]);
+
+  useEffect(() => setCursor(0), [q]);
+
+  const onListKey = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setCursor((c) => Math.min(c + 1, actions.length - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setCursor((c) => Math.max(c - 1, 0));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        const a = actions[cursor];
+        if (a) {
+          setOpen(false);
+          a.run();
+        }
+      } else if (e.key === "Escape") {
+        setOpen(false);
+      }
+    },
+    [actions, cursor]
+  );
+
+  useEffect(() => {
+    listRef.current
+      ?.querySelector(`[data-idx="${cursor}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [cursor]);
+
+  if (!open) return null;
+
+  const companyById = (a: Action) =>
+    a.kind === "company" ? companies.find((c) => `co-${c.id}` === a.id) : null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 pt-28 backdrop-blur-sm"
+      onMouseDown={() => setOpen(false)}
+    >
+      <div
+        className="glass-deep w-full max-w-lg overflow-hidden rounded-2xl shadow-glow"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <input
+          ref={inputRef}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={onListKey}
+          placeholder="Search companies, or pick an action…"
+          className="w-full border-b border-white/10 bg-transparent px-5 py-4 text-sm text-white outline-none placeholder:text-gray-600"
+        />
+        <div ref={listRef} className="max-h-80 overflow-y-auto p-2">
+          {actions.map((a, i) => {
+            const co = companyById(a);
+            return (
+              <button
+                key={a.id}
+                data-idx={i}
+                onClick={() => {
+                  setOpen(false);
+                  a.run();
+                }}
+                onMouseEnter={() => setCursor(i)}
+                className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-left text-sm transition-colors ${
+                  i === cursor ? "bg-white/10 text-white" : "text-gray-300"
+                }`}
+              >
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <span className="w-4 shrink-0 text-center text-xs text-gray-500">
+                    {a.kind === "company" ? "▸" : a.kind === "action" ? "⚡" : "↪"}
+                  </span>
+                  <span className="truncate">{a.label}</span>
+                  {co && <StatusPill status={co.status} />}
+                </span>
+                {a.hint && (
+                  <kbd className="ml-3 shrink-0 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-gray-500">
+                    {a.hint}
+                  </kbd>
+                )}
+              </button>
+            );
+          })}
+          {actions.length === 0 && (
+            <div className="px-4 py-8 text-center text-sm text-gray-600">
+              No matches — try a company name, domain, or industry.
+            </div>
+          )}
+        </div>
+        <div className="flex items-center justify-between border-t border-white/10 px-4 py-2 text-[11px] text-gray-600">
+          <span>⌘K toggle · ↑↓ select · ↵ run · esc close</span>
+          <span>quick nav: m f o a r u</span>
+        </div>
+      </div>
+    </div>
+  );
+}

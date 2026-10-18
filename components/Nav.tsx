@@ -6,6 +6,7 @@ import clsx from "clsx";
 
 const LINKS = [
   { href: "/", label: "Map", icon: "◉" },
+  { href: "/focus", label: "Focus", icon: "◎" },
   { href: "/opportunities", label: "Opportunities", icon: "⬡" },
   { href: "/accounts", label: "Accounts", icon: "▦" },
   { href: "/research", label: "Research", icon: "◈" },
@@ -24,7 +25,8 @@ export default function Nav() {
           NYC prospecting · Devin
         </span>
       </div>
-      <nav className="glass pointer-events-auto flex items-center gap-1 rounded-2xl p-1">
+      <div className="pointer-events-auto flex items-center gap-2">
+        <nav className="glass flex items-center gap-1 rounded-2xl p-1">
         {LINKS.map((l) => {
           const active = path === l.href;
           return (
@@ -43,7 +45,17 @@ export default function Nav() {
             </Link>
           );
         })}
-      </nav>
+        </nav>
+        <button
+          onClick={() =>
+            window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))
+          }
+          className="glass interactive rounded-2xl px-3 py-2 text-xs text-gray-500 hover:text-gray-300"
+          aria-label="Open command palette"
+        >
+          ⌘K
+        </button>
+      </div>
     </header>
   );
 }

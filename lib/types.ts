@@ -72,3 +72,38 @@ export interface JobStatus {
   failed: number;
   items: { companyId: number; name: string; state: "queued" | "running" | "done" | "failed" }[];
 }
+
+export interface CompanyEvent {
+  id: number;
+  companyId: number;
+  ts: string;
+  type: "pipeline" | "research" | "note" | "status" | "import";
+  text: string;
+}
+
+export type FocusActionType = "research" | "advance" | "re-research";
+
+export interface FocusItem {
+  companyId: number;
+  name: string;
+  status: CompanyStatus;
+  fitScore: number;
+  industry: string;
+  pipelineStage: PipelineStage | null;
+  action: FocusActionType;
+  label: string;
+  reason: string;
+  targetStage?: PipelineStage;
+}
+
+export interface IntelTool {
+  tool: string;
+  url: string;
+  mentions: number;
+  accounts: string[];
+}
+
+export interface IntelSummary {
+  tools: IntelTool[];
+  competitorClaims: number;
+}

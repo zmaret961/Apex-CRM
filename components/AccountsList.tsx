@@ -19,6 +19,12 @@ export default function AccountsList() {
   const [status, setStatus] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
 
+  // Deep link: /accounts?open=<id> opens the shared company drawer.
+  useEffect(() => {
+    const id = Number(new URLSearchParams(window.location.search).get("open"));
+    if (id) setSelected(id);
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(() => {
       const p = new URLSearchParams();

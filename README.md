@@ -31,13 +31,17 @@ required — the map uses the free CARTO dark basemap.
    appear live on the **Research** page.
 5. On Automation, hit **Import discovered enterprises** to pull the queued
    enterprise set (Wiz, Axonius, Palantir, Cloudflare…) into Accounts.
+6. Press **⌘K**, type a company name, hit Enter — the map flies to its pin
+   and opens the drawer. Then open **Focus** and clear the suggested actions
+   with one click each.
 
 ## Pages
 
 | Route | What it is |
 |---|---|
-| `/` | Full-viewport map, clustered glowing pins, live filters, company drawer |
-| `/accounts` | Searchable card list of every account |
+| `/` | Full-viewport map, clustered glowing pins, live filters, company drawer. Deep link: `/?focus=<id>` flies to a pin and opens its drawer |
+| `/focus` | Next-best-action queue: Apex tells you what to do next — refresh stale research, advance ready deals, research top-fit accounts. Includes the competitive-surface rollup |
+| `/accounts` | Searchable card list of every account. Deep link: `/accounts?open=<id>` |
 | `/opportunities` | Kanban: Identified → Researched → Engaged → Demo Scheduled → Proposal → Closed Won/Lost |
 | `/research` | Feed of agent briefs; every claim cites a source |
 | `/automation` | Agent console: run sweeps, import discovered enterprises, live activity log |
@@ -50,8 +54,19 @@ Citi, Ramp, Modal, AngelList, Reducto, Litera, Eight Sleep, Hippo). Where
 contract value isn't public, the UI says so rather than inventing a number.
 See `AGENTS.md` for the full rules.
 
+## Speed layer
+
+- **⌘K / Ctrl-K** opens the command palette anywhere: fuzzy-find any account
+  (jump straight to its pin on the map), run a research sweep, or hop pages.
+- Single-key nav when not typing: `m` map · `f` focus · `o` opportunities ·
+  `a` accounts · `r` research · `u` automation. `Esc` closes the drawer.
+- The company drawer has a per-account **activity timeline** (pipeline moves,
+  research runs, imports) and **notes** — pipeline moves are auto-logged, so
+  the board stays honest with zero data entry.
+
 ## Notes
 
 - Database file: `data/apex.db` (gitignored). `npm run seed` resets it.
+- `npm run lint` — ESLint (next/core-web-vitals).
 - Want real Mapbox instead of the free basemap? Set `NEXT_PUBLIC_MAPBOX_TOKEN`
   and swap `BASEMAP` in `components/MapView.tsx`.
