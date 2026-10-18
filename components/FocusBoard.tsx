@@ -56,6 +56,17 @@ export default function FocusBoard() {
     });
   }
 
+  function unsnooze(id: number) {
+    setSnoozed((m) => {
+      const next = new Map(m);
+      next.delete(id);
+      try {
+        localStorage.setItem(SNOOZE_KEY, JSON.stringify(Object.fromEntries(next)));
+      } catch { /* storage unavailable */ }
+      return next;
+    });
+  }
+
   async function load() {
     const d = await fetch("/api/focus").then((r) => r.json());
     setData(d);
@@ -86,6 +97,7 @@ export default function FocusBoard() {
     (i) => !done.has(i.companyId) && !snoozed.has(i.companyId)
   );
   const completed = (data?.items ?? []).filter((i) => done.has(i.companyId));
+  const snoozedItems = (data?.items ?? []).filter((i) => snoozed.has(i.companyId));
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
@@ -151,6 +163,27 @@ export default function FocusBoard() {
             <span className="shrink-0 text-xs text-emerald-300">done</span>
           </div>
         ))}
+        {snoozedItems.length > 0 && (
+          <div className="glass rounded-2xl p-3">
+            <div className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600">
+              Snoozed · {snoozedItems.length}
+            </div>
+            {snoozedItems.map((item) => (
+              <div
+                key={`snoozed-${item.companyId}`}
+                className="flex items-center justify-between rounded-lg px-2 py-1 text-xs"
+              >
+                <span className="truncate text-gray-500">{item.name}</span>
+                <button
+                  onClick={() => unsnooze(item.companyId)}
+                  className="interactive ml-2 rounded px-1.5 py-0.5 text-[10px] text-accent-soft hover:bg-accent/10"
+                >
+                  restore
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Competitive intel rollup */}

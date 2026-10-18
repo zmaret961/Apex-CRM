@@ -24,6 +24,7 @@ or Cognition-internal system involved. Everything runs on localhost.
   brief synthesizer. `lib/agent.ts` — in-process research-sweep runner.
 - `app/api/*` — thin JSON routes over those libs (`/api/companies`,
   `/api/companies/[id]`, `/api/research`, `/api/agent`, `/api/focus`).
+  Accounts exports the current filtered view to CSV client-side (no backend).
 - `app/page.tsx` = Map (index). `/focus`, `/accounts`, `/opportunities`,
   `/research`, `/automation`.
 - `components/CompanyDrawer.tsx` — the shared slide-over used by Map,
@@ -69,7 +70,9 @@ or Cognition-internal system involved. Everything runs on localhost.
    fully offline after `npm install`.
 5. **The CRM suggests; the seller clicks.** Prefer surfacing next actions
    (Focus page, auto-logged activity) over adding form fields — data entry
-   is a tax on selling time.
+   is a tax on selling time. Forgiving controls beat confirmations: every
+   kanban stage move posts an Undo toast; Focus suggestions can be snoozed
+   for 7 days (localStorage, restorable inline).
 6. API writes are validated (`isPipelineStage`, `isCompanyStatus`). Notes
    are capped at 2000 chars. Don't accept unvalidated writes.
 
