@@ -45,7 +45,10 @@ function exportCompaniesCsv(companies: Company[]) {
 function isTypingTarget(t: EventTarget | null): boolean {
   return (
     t instanceof HTMLElement &&
-    (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)
+    (t.tagName === "INPUT" ||
+      t.tagName === "TEXTAREA" ||
+      t.tagName === "SELECT" ||
+      t.isContentEditable)
   );
 }
 
