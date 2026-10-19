@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
+import os from "os";
 import {
   COMPANIES,
   DISCOVERED_COMPANIES,
@@ -11,7 +12,11 @@ import {
   type SeedCompany,
 } from "../data/dataset";
 
-const DB_PATH = path.join(process.cwd(), "data", "apex.db");
+// Serverless hosts (Vercel) have a read-only project dir — the only writable
+// path is the per-instance tmp dir, so the DB is ephemeral there.
+const DB_PATH = process.env.VERCEL
+  ? path.join(os.tmpdir(), "apex.db")
+  : path.join(process.cwd(), "data", "apex.db");
 
 let _db: Database.Database | null = null;
 
