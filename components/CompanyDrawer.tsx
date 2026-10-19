@@ -42,6 +42,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [editingValue, setEditingValue] = useState(false);
   const [valueDraft, setValueDraft] = useState("");
   const [removedStage, setRemovedStage] = useState<PipelineStage | null>(null);
+  const [advancedFrom, setAdvancedFrom] = useState<PipelineStage | null>(null);
   const [restoring, setRestoring] = useState(false);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -52,6 +53,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     }
     setAdded(false);
     setRemovedStage(null);
+    setAdvancedFrom(null);
     if (undoTimer.current) clearTimeout(undoTimer.current);
     fetch(`/api/companies/${companyId}`)
       .then((r) => r.json())
@@ -121,12 +123,32 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     onAdded?.();
   }
 
+  async function advanceTo(stage: PipelineStage) {
+    if (!company || company.pipelineStage == null) return;
+    const prev = company.pipelineStage;
+    await patch({ pipelineStage: stage });
+    setAdvancedFrom(prev);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoTimer.current = setTimeout(() => setAdvancedFrom(null), 6000);
+    onAdded?.();
+  }
+
+  async function undoAdvance() {
+    if (!advancedFrom || restoring) return;
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    const stage = advancedFrom;
+    setRestoring(true);
+    await patch({ pipelineStage: stage });
+    setRestoring(false);
+    setAdvancedFrom(null);
+    onAdded?.();
+  }
+
   async function runSuggestion() {
     if (!company || !suggestion) return;
     setActing(true);
     if (suggestion.action === "advance" && suggestion.targetStage) {
-      await patch({ pipelineStage: suggestion.targetStage });
-      onAdded?.();
+      await advanceTo(suggestion.targetStage);
     } else {
       await fetch("/api/agent", {
         method: "POST",
@@ -508,10 +530,19 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
             )}
             {company.pipelineStage != null && nextStage(company.pipelineStage) && (
               <button
-                onClick={() => patch({ pipelineStage: nextStage(company.pipelineStage!) })}
+                onClick={() => advanceTo(nextStage(company.pipelineStage!)!)}
                 className="interactive -mt-3 w-full rounded-xl border border-emerald-400/30 bg-emerald-400/10 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-400/20"
               >
                 Advance → {nextStage(company.pipelineStage)}
+              </button>
+            )}
+            {advancedFrom != null && company.pipelineStage != null && (
+              <button
+                onClick={undoAdvance}
+                disabled={restoring}
+                className="interactive -mt-3 w-full rounded-xl border border-amber-400/30 bg-amber-400/10 py-2 text-xs font-medium text-amber-300 hover:bg-amber-400/20"
+              >
+                {restoring ? "Restoring…" : `Moved to ${company.pipelineStage} — Undo (was ${advancedFrom})`}
               </button>
             )}
             {company.pipelineStage != null && (
