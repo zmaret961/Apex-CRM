@@ -7,10 +7,12 @@ import clsx from "clsx";
 const LINKS = [
   { href: "/", label: "Map", icon: "◉" },
   { href: "/focus", label: "Focus", icon: "◎" },
+  { href: "/hot-leads", label: "Hot Leads", icon: "🔥" },
   { href: "/opportunities", label: "Opportunities", icon: "⬡" },
   { href: "/accounts", label: "Accounts", icon: "▦" },
   { href: "/research", label: "Research", icon: "◈" },
   { href: "/automation", label: "Automation", icon: "⚡" },
+  { href: "/integrations", label: "Integrations", icon: "🧩" },
 ];
 
 export default function Nav() {
@@ -26,7 +28,7 @@ export default function Nav() {
         </span>
       </div>
       <div className="pointer-events-auto flex items-center gap-2">
-        <nav className="glass flex items-center gap-1 rounded-2xl p-1">
+        <nav className="glass flex max-w-[72vw] items-center gap-1 overflow-x-auto rounded-2xl p-1">
         {LINKS.map((l) => {
           const active = path === l.href;
           return (

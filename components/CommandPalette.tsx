@@ -17,10 +17,12 @@ interface Action {
 const NAV: { id: string; label: string; href: string; key: string }[] = [
   { id: "nav-map", label: "Go to Map", href: "/", key: "m" },
   { id: "nav-focus", label: "Go to Focus", href: "/focus", key: "f" },
+  { id: "nav-hot", label: "Go to Hot Leads", href: "/hot-leads", key: "h" },
   { id: "nav-opps", label: "Go to Opportunities", href: "/opportunities", key: "o" },
   { id: "nav-accounts", label: "Go to Accounts", href: "/accounts", key: "a" },
   { id: "nav-research", label: "Go to Research", href: "/research", key: "r" },
   { id: "nav-automation", label: "Go to Automation", href: "/automation", key: "u" },
+  { id: "nav-integrations", label: "Go to Integrations", href: "/integrations", key: "i" },
 ];
 
 function exportCompaniesCsv(companies: Company[]) {
