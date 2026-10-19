@@ -483,6 +483,11 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
               </section>
             )}
 
+            {company.status === "competitor" && company.pipelineStage == null ? (
+              <div className="w-full rounded-xl border border-rose-400/20 bg-rose-400/5 py-2.5 text-center text-sm text-rose-300/80">
+                Competitor — intel only
+              </div>
+            ) : (
             <button
               onClick={addToPipeline}
               disabled={adding || added || company.pipelineStage != null}
@@ -500,6 +505,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 ? "Adding…"
                 : "Add to Opportunities"}
             </button>
+            )}
             {company.pipelineStage != null && nextStage(company.pipelineStage) && (
               <button
                 onClick={() => patch({ pipelineStage: nextStage(company.pipelineStage!) })}
