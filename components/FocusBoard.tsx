@@ -52,6 +52,9 @@ export default function FocusBoard() {
   const [busy, setBusy] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [sweep, setSweep] = useState<JobStatus | null>(null);
+  // Forgiving controls: completed "advance" actions keep the previous
+  // stage so a misclick can be put back in one click.
+  const [undos, setUndos] = useState<Map<number, string>>(new Map());
 
   useEffect(() => {
     setSnoozed(loadSnoozed());
@@ -119,11 +122,14 @@ export default function FocusBoard() {
   async function act(item: FocusItem) {
     setBusy(item.companyId);
     if (item.action === "advance" && item.targetStage) {
-      await fetch(`/api/companies/${item.companyId}`, {
+      const r = await fetch(`/api/companies/${item.companyId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pipelineStage: item.targetStage }),
       });
+      if (r.ok && item.pipelineStage) {
+        setUndos((m) => new Map(m).set(item.companyId, item.pipelineStage!));
+      }
     } else {
       await fetch("/api/agent", {
         method: "POST",
@@ -132,6 +138,28 @@ export default function FocusBoard() {
     }
     setBusy(null);
     setDone((s) => new Set(s).add(item.companyId));
+  }
+
+  async function undoAdvance(item: FocusItem) {
+    const prev = undos.get(item.companyId);
+    if (!prev) return;
+    setBusy(item.companyId);
+    await fetch(`/api/companies/${item.companyId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pipelineStage: prev }),
+    });
+    setBusy(null);
+    setUndos((m) => {
+      const next = new Map(m);
+      next.delete(item.companyId);
+      return next;
+    });
+    setDone((s) => {
+      const next = new Set(s);
+      next.delete(item.companyId);
+      return next;
+    });
   }
 
   const pending = (data?.items ?? []).filter(
@@ -240,6 +268,15 @@ export default function FocusBoard() {
             <div className="min-w-0 flex-1">
               <span className="truncate text-sm text-gray-400 line-through">{item.name}</span>
             </div>
+            {undos.has(item.companyId) && (
+              <button
+                onClick={() => undoAdvance(item)}
+                disabled={busy === item.companyId}
+                className="interactive shrink-0 rounded-lg border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-xs text-amber-300 hover:bg-amber-400/20 disabled:opacity-40"
+              >
+                {busy === item.companyId ? "…" : "undo"}
+              </button>
+            )}
             <span className="shrink-0 text-xs text-emerald-300">done</span>
           </div>
         ))}
