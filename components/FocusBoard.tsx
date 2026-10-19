@@ -52,9 +52,22 @@ export default function FocusBoard() {
   const [busy, setBusy] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [sweep, setSweep] = useState<JobStatus | null>(null);
-  // Forgiving controls: completed "advance" actions keep the previous
-  // stage so a misclick can be put back in one click.
-  const [undos, setUndos] = useState<Map<number, string>>(new Map());
+  // Forgiving controls: completed "advance" actions keep the actual move
+  // ({from, to} at click time) so a misclick can be put back in one click
+  // even after the board data refreshes.
+  const [undos, setUndos] = useState<Map<number, { from: string | null; to: string }>>(new Map());
+
+  // Keep the pipeline strip truthful without a refetch. `from`/`to` are the
+  // real stages involved — never a cached suggestion's stage.
+  function adjustCounts(from: string | null, to: string | null) {
+    setData((d) => {
+      if (!d) return d;
+      const pipeline = { ...d.pipeline };
+      if (from) pipeline[from] = Math.max(0, (pipeline[from] ?? 0) - 1);
+      if (to) pipeline[to] = (pipeline[to] ?? 0) + 1;
+      return { ...d, pipeline };
+    });
+  }
 
   useEffect(() => {
     setSnoozed(loadSnoozed());
@@ -122,13 +135,20 @@ export default function FocusBoard() {
   async function act(item: FocusItem) {
     setBusy(item.companyId);
     if (item.action === "advance" && item.targetStage) {
+      // Read the company's live stage first — the suggestion may be stale
+      // (e.g. the deal was already advanced from its drawer).
+      const before = await fetch(`/api/companies/${item.companyId}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+      const actualPrev: string | null = before?.company?.pipelineStage ?? null;
       const r = await fetch(`/api/companies/${item.companyId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pipelineStage: item.targetStage }),
       });
-      if (r.ok && item.pipelineStage) {
-        setUndos((m) => new Map(m).set(item.companyId, item.pipelineStage!));
+      if (r.ok && actualPrev !== item.targetStage) {
+        setUndos((m) => new Map(m).set(item.companyId, { from: actualPrev, to: item.targetStage! }));
+        adjustCounts(actualPrev, item.targetStage);
       }
     } else {
       await fetch("/api/agent", {
@@ -141,20 +161,22 @@ export default function FocusBoard() {
   }
 
   async function undoAdvance(item: FocusItem) {
-    const prev = undos.get(item.companyId);
-    if (!prev) return;
+    const move = undos.get(item.companyId);
+    if (!move) return;
     setBusy(item.companyId);
-    await fetch(`/api/companies/${item.companyId}`, {
+    const r = await fetch(`/api/companies/${item.companyId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pipelineStage: prev }),
+      body: JSON.stringify({ pipelineStage: move.from }),
     });
     setBusy(null);
+    if (!r.ok) return; // keep the undo control and the current counts
     setUndos((m) => {
       const next = new Map(m);
       next.delete(item.companyId);
       return next;
     });
+    adjustCounts(move.to, move.from);
     setDone((s) => {
       const next = new Set(s);
       next.delete(item.companyId);
