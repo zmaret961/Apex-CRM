@@ -23,6 +23,7 @@ export default function AccountsList() {
   const [sort, setSort] = useState<"fit" | "name" | "employees">("fit");
   const [selected, setSelected] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Deep link: /accounts?open=<id> opens the shared company drawer.
   const searchParams = useSearchParams();
@@ -68,7 +69,7 @@ export default function AccountsList() {
         });
     }, 180);
     return () => clearTimeout(t);
-  }, [q, industry, status, stage, sort]);
+  }, [q, industry, status, stage, sort, refreshKey]);
 
   function exportCsv() {
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
@@ -210,6 +211,7 @@ export default function AccountsList() {
           onClose={() => setAdding(false)}
           onCreated={(id) => {
             setAdding(false);
+            setRefreshKey((k) => k + 1);
             setSelected(id);
           }}
         />
