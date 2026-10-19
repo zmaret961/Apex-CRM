@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { ResearchBrief } from "@/lib/types";
 import StatusPill from "./StatusPill";
@@ -24,6 +24,26 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
   const [category, setCategory] = useState("");
   const [q, setQ] = useState("");
   const [promoting, setPromoting] = useState<number | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // "/" jumps to search — same list-page shortcut as Accounts.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement;
+      if (
+        el.tagName === "INPUT" ||
+        el.tagName === "TEXTAREA" ||
+        el.tagName === "SELECT" ||
+        el.isContentEditable
+      )
+        return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Deep link: /research?q=<term> pre-fills the full-text filter
   // (Focus competitive-surface 'feed' links land here).
@@ -71,9 +91,10 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
     <div className="space-y-4">
       <div className="glass flex flex-wrap items-center gap-2 rounded-2xl px-4 py-2.5">
         <input
+          ref={searchRef}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search briefs — company, 'Copilot', 'hiring'…"
+          placeholder="Search briefs — company, 'Copilot', 'hiring'… ( / )"
           className="interactive w-48 rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-sm outline-none placeholder:text-gray-600 focus:border-accent/50"
         />
         {categories.map((c) => (
