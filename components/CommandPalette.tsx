@@ -129,6 +129,13 @@ export default function CommandPalette() {
       hint: "csv",
       run: () => exportCompaniesCsv(companies),
     });
+    list.push({
+      id: "act-add",
+      kind: "action",
+      label: "Add a company",
+      hint: "new",
+      run: () => router.push("/accounts?add=1"),
+    });
     if (q.trim()) {
       const needle = q.trim().toLowerCase();
       const companyHits = companies

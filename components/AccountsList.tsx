@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { PIPELINE_STAGES, type Company } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import FitScore from "./FitScore";
@@ -26,12 +26,20 @@ export default function AccountsList() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Deep link: /accounts?open=<id> opens the shared company drawer.
+  //            /accounts?add=1 opens the Add company modal (⌘K action).
   const searchParams = useSearchParams();
+  const router = useRouter();
   const openId = Number(searchParams.get("open")) || null;
   useEffect(() => {
     if (openId) setSelected(openId);
     else setSelected(null);
   }, [openId]);
+  useEffect(() => {
+    if (searchParams.get("add") === "1") {
+      setAdding(true);
+      router.replace("/accounts");
+    }
+  }, [searchParams, router]);
 
   // While the drawer is open, ↑/↓ steps through the current filtered list —
   // a seller can review a whole territory without touching the mouse.
