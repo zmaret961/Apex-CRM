@@ -24,17 +24,27 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const companyId = Number(id);
-  if (!getCompany(companyId)) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const current = getCompany(companyId);
+  if (!current) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
   if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
 
+  // Competitors are intel targets — they can never hold a pipeline stage.
+  const effectiveStatus = "status" in body ? body.status : current.status;
+
   if ("pipelineStage" in body) {
     if (body.pipelineStage !== null && !isPipelineStage(body.pipelineStage)) {
       return NextResponse.json(
         { error: `pipelineStage must be one of the pipeline stages or null` },
+        { status: 400 }
+      );
+    }
+    if (body.pipelineStage !== null && effectiveStatus === "competitor") {
+      return NextResponse.json(
+        { error: "competitors are intel targets — they cannot be added to the pipeline" },
         { status: 400 }
       );
     }
@@ -45,6 +55,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "invalid status" }, { status: 400 });
     }
     setStatus(companyId, body.status);
+    if (body.status === "competitor" && current.pipelineStage != null) {
+      updatePipeline(companyId, null);
+    }
   }
   if ("estimatedValue" in body) {
     const v = body.estimatedValue;
