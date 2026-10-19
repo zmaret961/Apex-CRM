@@ -106,6 +106,9 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
                 </button>
                 <div className="mt-0.5 text-xs text-gray-500">
                   {new Date(b.createdAt).toLocaleString()}
+                  {Date.now() - new Date(b.createdAt).getTime() > 30 * 864e5 && (
+                    <span className="ml-1.5 text-amber-400">· stale</span>
+                  )}
                   {b.companyStatus && (
                     <span className="ml-2"><StatusPill status={b.companyStatus} /></span>
                   )}
