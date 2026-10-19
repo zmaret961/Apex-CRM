@@ -6,6 +6,7 @@ import {
   DISCOVERED_COMPANIES,
   DISCOVERED_COMPANIES_V2,
   DISCOVERED_COMPANIES_V3,
+  DISCOVERED_COMPANIES_V4,
   SEED_BRIEFS,
   type SeedCompany,
 } from "../data/dataset";
@@ -187,5 +188,10 @@ function applyDataMigrations(db: Database.Database) {
     // Batch 3 — global banks, trading firms, NYC health systems.
     insertDiscovered(DISCOVERED_COMPANIES_V3);
     db.pragma("user_version = 4");
+  }
+  if (v < 5) {
+    // Batch 4 — more NYC HQs: banks/insurers, media groups, utility.
+    insertDiscovered(DISCOVERED_COMPANIES_V4);
+    db.pragma("user_version = 5");
   }
 }
