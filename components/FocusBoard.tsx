@@ -129,6 +129,14 @@ export default function FocusBoard() {
       });
       if (r.ok && item.pipelineStage) {
         setUndos((m) => new Map(m).set(item.companyId, item.pipelineStage!));
+        // Keep the pipeline strip truthful without a refetch.
+        setData((d) => {
+          if (!d) return d;
+          const pipeline = { ...d.pipeline };
+          pipeline[item.pipelineStage!] = Math.max(0, (pipeline[item.pipelineStage!] ?? 0) - 1);
+          pipeline[item.targetStage!] = (pipeline[item.targetStage!] ?? 0) + 1;
+          return { ...d, pipeline };
+        });
       }
     } else {
       await fetch("/api/agent", {
@@ -154,6 +162,13 @@ export default function FocusBoard() {
       const next = new Map(m);
       next.delete(item.companyId);
       return next;
+    });
+    setData((d) => {
+      if (!d) return d;
+      const pipeline = { ...d.pipeline };
+      pipeline[item.targetStage!] = Math.max(0, (pipeline[item.targetStage!] ?? 0) - 1);
+      pipeline[prev] = (pipeline[prev] ?? 0) + 1;
+      return { ...d, pipeline };
     });
     setDone((s) => {
       const next = new Set(s);
