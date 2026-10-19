@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { FocusItem, IntelSummary } from "@/lib/types";
+import type { FocusItem, IntelSummary, JobStatus } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import CompanyDrawer from "./CompanyDrawer";
 import clsx from "clsx";
@@ -10,6 +10,7 @@ interface FocusData {
   items: FocusItem[];
   intel: IntelSummary;
   pipeline: Record<string, number>;
+  digest: { pipelineMoves: number; researchRuns: number; imports: number; notes: number };
 }
 
 const STAGE_ORDER = [
@@ -50,10 +51,43 @@ export default function FocusBoard() {
   const [snoozed, setSnoozed] = useState<Map<number, number>>(new Map());
   const [busy, setBusy] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
+  const [sweep, setSweep] = useState<JobStatus | null>(null);
+  // Forgiving controls: completed "advance" actions keep the previous
+  // stage so a misclick can be put back in one click.
+  const [undos, setUndos] = useState<Map<number, string>>(new Map());
 
   useEffect(() => {
     setSnoozed(loadSnoozed());
+    // Reflect a sweep already running (e.g. started from Automation).
+    fetch("/api/agent")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.job?.running) setSweep(d.job);
+      })
+      .catch(() => {});
   }, []);
+
+  async function startSweep() {
+    const d = await fetch("/api/agent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    }).then((r) => r.json());
+    if (d.job) setSweep(d.job);
+  }
+
+  // Poll a running sweep; refresh the board when it finishes.
+  useEffect(() => {
+    if (!sweep?.running) return;
+    const t = setInterval(async () => {
+      const d = await fetch(`/api/agent?jobId=${sweep.jobId}`).then((r) => r.json());
+      setSweep(d.job ?? null);
+      // job is null after completion (pruned) — refresh either way.
+      if (!d.job || !d.job.running) load();
+    }, 2000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sweep?.jobId, sweep?.running]);
 
   function snooze(id: number) {
     const until = Date.now() + SNOOZE_DAYS * 86400000;
@@ -88,11 +122,14 @@ export default function FocusBoard() {
   async function act(item: FocusItem) {
     setBusy(item.companyId);
     if (item.action === "advance" && item.targetStage) {
-      await fetch(`/api/companies/${item.companyId}`, {
+      const r = await fetch(`/api/companies/${item.companyId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pipelineStage: item.targetStage }),
       });
+      if (r.ok && item.pipelineStage) {
+        setUndos((m) => new Map(m).set(item.companyId, item.pipelineStage!));
+      }
     } else {
       await fetch("/api/agent", {
         method: "POST",
@@ -101,6 +138,28 @@ export default function FocusBoard() {
     }
     setBusy(null);
     setDone((s) => new Set(s).add(item.companyId));
+  }
+
+  async function undoAdvance(item: FocusItem) {
+    const prev = undos.get(item.companyId);
+    if (!prev) return;
+    setBusy(item.companyId);
+    await fetch(`/api/companies/${item.companyId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pipelineStage: prev }),
+    });
+    setBusy(null);
+    setUndos((m) => {
+      const next = new Map(m);
+      next.delete(item.companyId);
+      return next;
+    });
+    setDone((s) => {
+      const next = new Set(s);
+      next.delete(item.companyId);
+      return next;
+    });
   }
 
   const pending = (data?.items ?? []).filter(
@@ -124,7 +183,27 @@ export default function FocusBoard() {
               </span>
             </span>
           ))}
-          <span className="ml-auto text-gray-500">
+          {(data.digest.pipelineMoves + data.digest.researchRuns + data.digest.imports) > 0 && (
+            <span className="text-gray-500" title="Activity in the last 7 days">
+              7d: {data.digest.pipelineMoves} move{data.digest.pipelineMoves === 1 ? "" : "s"}
+              {" · "}{data.digest.researchRuns} brief{data.digest.researchRuns === 1 ? "" : "s"}
+              {" · "}{data.digest.imports} import{data.digest.imports === 1 ? "" : "s"}
+            </span>
+          )}
+          <span className="ml-auto flex items-center gap-3 text-gray-500">
+            {sweep?.running ? (
+              <span className="text-violet-300">
+                Sweep running · {sweep.done}/{sweep.total}
+              </span>
+            ) : (
+              <button
+                onClick={startSweep}
+                className="interactive rounded-lg border border-violet-300/30 bg-violet-400/10 px-2.5 py-1 text-[11px] font-medium text-violet-300 hover:bg-violet-400/20"
+                title="Queue research for every stale or unresearched account"
+              >
+                Run research sweep
+              </button>
+            )}
             {pending.length} suggestion{pending.length === 1 ? "" : "s"} open
           </span>
         </div>
@@ -189,6 +268,15 @@ export default function FocusBoard() {
             <div className="min-w-0 flex-1">
               <span className="truncate text-sm text-gray-400 line-through">{item.name}</span>
             </div>
+            {undos.has(item.companyId) && (
+              <button
+                onClick={() => undoAdvance(item)}
+                disabled={busy === item.companyId}
+                className="interactive shrink-0 rounded-lg border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-xs text-amber-300 hover:bg-amber-400/20 disabled:opacity-40"
+              >
+                {busy === item.companyId ? "…" : "undo"}
+              </button>
+            )}
             <span className="shrink-0 text-xs text-emerald-300">done</span>
           </div>
         ))}
@@ -234,7 +322,15 @@ export default function FocusBoard() {
                   >
                     {t.tool} ↗
                   </a>
-                  <span className="text-xs text-gray-500">{t.mentions} mentions</span>
+                  <span className="flex items-center gap-2 text-xs text-gray-500">
+                    <a
+                      href={`/research?q=${encodeURIComponent(t.tool === "Claude Code" ? "claude" : t.tool.split(" ").pop()!.toLowerCase())}`}
+                      className="text-accent-soft/80 hover:text-accent-soft hover:underline"
+                    >
+                      feed
+                    </a>
+                    {t.mentions} mentions
+                  </span>
                 </div>
                 <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/5">
                   <div
@@ -259,8 +355,9 @@ export default function FocusBoard() {
           <h3 className="text-sm font-semibold text-white">How Focus works</h3>
           <p className="mt-2">
             Apex continuously scores your book and queues the highest-leverage next action —
-            refresh stale pipeline research, advance deals that are ready, and research top-fit
-            accounts with no brief on file.
+            refresh stale pipeline research, advance deals that are ready, re-engage stuck
+            deals, keep customer + competitor intel fresh, and research top-fit accounts with
+            no brief on file.
           </p>
           <p className="mt-2 text-gray-500">
             Actions run the real workflows: research writes a cited brief; advancing updates the

@@ -29,6 +29,7 @@ export function listCompanies(opts: {
   status?: string;
   minFit?: number;
   discovered?: boolean;
+  stage?: string;
 }): Company[] {
   const db = getDb();
   const where: string[] = ["c.discovered = ?"];
@@ -50,6 +51,14 @@ export function listCompanies(opts: {
     where.push("c.fitScore >= ?");
     args.push(opts.minFit);
   }
+  if (opts.stage === "open") {
+    where.push("c.pipelineStage IS NOT NULL AND c.pipelineStage NOT IN ('Closed Won','Closed Lost')");
+  } else if (opts.stage === "none") {
+    where.push("c.pipelineStage IS NULL");
+  } else if (opts.stage) {
+    where.push("c.pipelineStage = ?");
+    args.push(opts.stage);
+  }
   const rows = db
     .prepare(
       `SELECT c.*,
@@ -63,8 +72,57 @@ export function listCompanies(opts: {
 
 export function getCompany(id: number): Company | null {
   const db = getDb();
-  const row = db.prepare("SELECT * FROM companies WHERE id = ?").get(id) as RawCompany | undefined;
+  const row = db
+    .prepare(
+      `SELECT c.*,
+         (SELECT MAX(ce.ts) FROM company_events ce
+           WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt
+       FROM companies c WHERE c.id = ?`
+    )
+    .get(id) as RawCompany | undefined;
   return row ? hydrate(row) : null;
+}
+
+export function addCompany(input: {
+  name: string;
+  domain: string;
+  industry: string;
+  address: string;
+  lat: number;
+  lng: number;
+  employees: number;
+  funding: string;
+  description: string;
+  fitScore: number;
+  sourceUrl: string;
+  signal?: string;
+}): Company {
+  const db = getDb();
+  const r = db
+    .prepare(
+      `INSERT INTO companies (name, domain, industry, address, lat, lng, employees, funding,
+         status, fitScore, pipelineStage, estimatedValue, lastResearchAt, description,
+         sources, signals, discovered)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'prospect', ?, NULL, NULL, NULL, ?, ?, ?, 0)`
+    )
+    .run(
+      input.name,
+      input.domain,
+      input.industry,
+      input.address,
+      input.lat,
+      input.lng,
+      input.employees,
+      input.funding,
+      input.fitScore,
+      input.description,
+      JSON.stringify([input.sourceUrl]),
+      JSON.stringify(input.signal ? [{ text: input.signal, source: input.sourceUrl }] : [])
+    );
+  const id = Number(r.lastInsertRowid);
+  addEvent(id, "import", "Added manually by seller");
+  log("crm", "info", `${input.name}: added manually (domain ${input.domain})`);
+  return getCompany(id)!;
 }
 
 export function updatePipeline(id: number, stage: PipelineStage | null) {
@@ -95,6 +153,14 @@ export function addEvent(companyId: number, type: CompanyEvent["type"], text: st
   );
 }
 
+export function deleteNote(companyId: number, eventId: number): boolean {
+  const db = getDb();
+  const r = db
+    .prepare("DELETE FROM company_events WHERE id = ? AND companyId = ? AND type = 'note'")
+    .run(eventId, companyId);
+  return r.changes > 0;
+}
+
 export function eventsFor(companyId: number): CompanyEvent[] {
   const db = getDb();
   return db
@@ -107,6 +173,14 @@ export function markResearched(id: number) {
   db.prepare(
     "UPDATE companies SET lastResearchAt = datetime('now'), updatedAt = datetime('now') WHERE id = ?"
   ).run(id);
+}
+
+export function setEstimatedValue(id: number, value: string | null) {
+  const db = getDb();
+  db.prepare(
+    "UPDATE companies SET estimatedValue = ?, updatedAt = datetime('now') WHERE id = ?"
+  ).run(value, id);
+  addEvent(id, "note", value ? `Deal value set to ${value}` : "Deal value cleared");
 }
 
 export function setStatus(id: number, status: CompanyStatus) {
@@ -194,7 +268,17 @@ export function recentLog(limit = 100): LogEntry[] {
 
 export function stats() {
   const db = getDb();
+  const sweep = db
+    .prepare(
+      `SELECT ts, message FROM activity_log
+       WHERE message LIKE 'Sweep % complete — %' ORDER BY id DESC LIMIT 1`
+    )
+    .get() as { ts: string; message: string } | undefined;
+  const lastSweep = sweep
+    ? { ts: sweep.ts, result: sweep.message.split("complete — ")[1] ?? sweep.message }
+    : null;
   return {
+    lastSweep,
     total: (db.prepare("SELECT COUNT(*) c FROM companies WHERE discovered = 0").get() as { c: number }).c,
     customers: (db.prepare("SELECT COUNT(*) c FROM companies WHERE status='customer' AND discovered=0").get() as { c: number }).c,
     prospects: (db.prepare("SELECT COUNT(*) c FROM companies WHERE status='prospect' AND discovered=0").get() as { c: number }).c,
@@ -268,6 +352,49 @@ export function suggestedActions(limit = 12): FocusItem[] {
       label: "Refresh customer intel",
       reason:
         "Existing Devin customer with stale intel — look for the next expansion team before your check-in.",
+    });
+  }
+
+  const competitors = db
+    .prepare(
+      `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage FROM companies
+       WHERE discovered = 0 AND status = 'competitor'
+         AND (lastResearchAt IS NULL OR lastResearchAt < datetime('now','-30 days'))
+       ORDER BY fitScore DESC LIMIT 2`
+    )
+    .all() as Omit<FocusItem, "action" | "label" | "reason">[];
+  for (const c of competitors) {
+    items.push({
+      ...c,
+      action: "re-research",
+      label: "Refresh competitor intel",
+      reason:
+        "Ships a rival AI coding product — stale intel means stale talk tracks when it comes up on calls.",
+    });
+  }
+
+  // Deals parked in an active stage with no stage movement in 14+ days —
+  // the kanban badge shows the age; this puts a re-engage action in front
+  // of the seller.
+  const stuck = db
+    .prepare(
+      `SELECT id AS companyId, name, status, fitScore, industry, pipelineStage,
+         (SELECT MAX(ts) FROM company_events e WHERE e.companyId = companies.id AND e.type = 'pipeline') AS stageChangedAt
+       FROM companies
+       WHERE discovered = 0 AND status != 'competitor'
+         AND pipelineStage IN ('Engaged','Demo Scheduled','Proposal')
+         AND COALESCE(stageChangedAt, '2000-01-01') < datetime('now','-14 days')
+       ORDER BY fitScore DESC LIMIT 3`
+    )
+    .all() as (Omit<FocusItem, "action" | "label" | "reason"> & { stageChangedAt: string | null })[];
+  for (const c of stuck) {
+    items.push({
+      ...c,
+      action: "re-research",
+      label: "Re-engage (stuck deal)",
+      reason: c.stageChangedAt
+        ? `${Math.max(1, Math.floor((Date.now() - new Date(c.stageChangedAt + "Z").getTime()) / 86400000))}d in ${c.pipelineStage} with no stage movement — a fresh signal gives you a reason to re-open the thread.`
+        : `In ${c.pipelineStage} with no recorded stage movement — a fresh signal gives you a reason to re-open the thread.`,
     });
   }
 
@@ -384,6 +511,23 @@ export function searchResearch(q: string, limit = 8): SearchHit[] {
        LIMIT ?`
     )
     .all(needle, needle, needle, limit) as SearchHit[];
+}
+
+export function weeklyDigest() {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT type, COUNT(*) AS c FROM company_events
+       WHERE ts > datetime('now', '-7 days') GROUP BY type`
+    )
+    .all() as { type: string; c: number }[];
+  const by = Object.fromEntries(rows.map((r) => [r.type, r.c]));
+  return {
+    pipelineMoves: (by.pipeline as number) ?? 0,
+    researchRuns: (by.research as number) ?? 0,
+    imports: (by.import as number) ?? 0,
+    notes: (by.note as number) ?? 0,
+  };
 }
 
 export function pipelineCounts(): Record<string, number> {

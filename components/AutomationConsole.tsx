@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Company, JobStatus, LogEntry } from "@/lib/types";
+import CompanyDrawer from "./CompanyDrawer";
 import clsx from "clsx";
 
 interface AgentState {
@@ -14,13 +15,23 @@ interface AgentState {
     discovered: number;
     briefs: number;
     inPipeline: number;
+    lastSweep: { ts: string; result: string } | null;
   };
+}
+
+function ago(ts: string): string {
+  const s = Math.max(0, (Date.now() - new Date(ts.replace(" ", "T") + "Z").getTime()) / 1000);
+  if (s < 90) return `${Math.floor(s)}s ago`;
+  if (s < 5400) return `${Math.floor(s / 60)}m ago`;
+  if (s < 129600) return `${Math.floor(s / 3600)}h ago`;
+  return new Date(ts.replace(" ", "T") + "Z").toLocaleDateString();
 }
 
 export default function AutomationConsole() {
   const [state, setState] = useState<AgentState | null>(null);
   const [importing, setImporting] = useState(false);
   const [discovered, setDiscovered] = useState<Company[]>([]);
+  const [selected, setSelected] = useState<number | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   async function poll() {
@@ -86,9 +97,15 @@ export default function AutomationConsole() {
             <>
               <ul className="mt-3 space-y-1 text-xs text-gray-500">
                 {discovered.slice(0, 10).map((c) => (
-                  <li key={c.id} className="truncate">
-                    <span className="text-gray-300">{c.name}</span>
-                    <span className="text-gray-600"> · {c.industry} · fit {c.fitScore}</span>
+                  <li key={c.id}>
+                    <button
+                      onClick={() => setSelected(c.id)}
+                      title="Preview before importing"
+                      className="interactive -mx-1 w-full truncate rounded px-1 text-left hover:bg-white/5"
+                    >
+                      <span className="text-gray-300 hover:text-accent-soft">{c.name}</span>
+                      <span className="text-gray-600"> · {c.industry} · fit {c.fitScore}</span>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -109,6 +126,14 @@ export default function AutomationConsole() {
             <Stat label="Customers" value={state.stats.customers} accent="text-emerald-300" />
             <Stat label="In pipeline" value={state.stats.inPipeline} accent="text-accent-soft" />
             <Stat label="Briefs" value={state.stats.briefs} accent="text-violet-300" />
+          </div>
+        )}
+
+        {state?.stats.lastSweep && (
+          <div className="glass rounded-2xl px-5 py-3 text-xs text-gray-400">
+            Last sweep:{" "}
+            <span className="text-gray-200">{state.stats.lastSweep.result}</span>
+            <span className="text-gray-600"> · {ago(state.stats.lastSweep.ts)}</span>
           </div>
         )}
 
@@ -186,6 +211,7 @@ export default function AutomationConsole() {
           )}
         </div>
       </div>
+      <CompanyDrawer companyId={selected} onClose={() => setSelected(null)} onAdded={poll} />
     </div>
   );
 }

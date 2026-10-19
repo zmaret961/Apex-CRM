@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { ResearchBrief } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import CompanyDrawer from "./CompanyDrawer";
@@ -23,6 +24,14 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
   const [category, setCategory] = useState("");
   const [q, setQ] = useState("");
   const [promoting, setPromoting] = useState<number | null>(null);
+
+  // Deep link: /research?q=<term> pre-fills the full-text filter
+  // (Focus competitive-surface 'feed' links land here).
+  const searchParams = useSearchParams();
+  const qParam = searchParams.get("q");
+  useEffect(() => {
+    if (qParam) setQ(qParam);
+  }, [qParam]);
 
   // Poll so new briefs appear while a sweep is running
   useEffect(() => {
@@ -47,10 +56,15 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
   }
 
   const categories = [...new Set(briefs.flatMap((b) => b.claims.map((c) => c.category)))];
+  const needle = q.trim().toLowerCase();
   const filtered = briefs.filter(
     (b) =>
       (!category || b.claims.some((c) => c.category === category)) &&
-      (!q || (b.companyName ?? "").toLowerCase().includes(q.toLowerCase()))
+      (!needle ||
+        [b.companyName ?? "", b.whatTheyDo, b.whyNow, ...b.claims.map((c) => `${c.category} ${c.text}`)]
+          .join("\n")
+          .toLowerCase()
+          .includes(needle))
   );
 
   return (
@@ -59,7 +73,7 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Filter by company…"
+          placeholder="Search briefs — company, 'Copilot', 'hiring'…"
           className="interactive w-48 rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-sm outline-none placeholder:text-gray-600 focus:border-accent/50"
         />
         {categories.map((c) => (
@@ -92,6 +106,9 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
                 </button>
                 <div className="mt-0.5 text-xs text-gray-500">
                   {new Date(b.createdAt).toLocaleString()}
+                  {Date.now() - new Date(b.createdAt).getTime() > 30 * 864e5 && (
+                    <span className="ml-1.5 text-amber-400">· stale</span>
+                  )}
                   {b.companyStatus && (
                     <span className="ml-2"><StatusPill status={b.companyStatus} /></span>
                   )}
@@ -108,7 +125,7 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
                   <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-gray-400">
                     {b.companyPipelineStage}
                   </span>
-                ) : b.companyStatus === "customer" ? null : (
+                ) : b.companyStatus === "customer" || b.companyStatus === "competitor" ? null : (
                   <button
                     onClick={() => promote(b)}
                     disabled={promoting === b.companyId}
@@ -124,6 +141,18 @@ export default function ResearchFeed({ initialBriefs }: { initialBriefs: Researc
               <span className="font-medium text-accent-soft">Why now — </span>
               {b.whyNow}
             </div>
+            {!open && needle && (
+              <ul className="mt-2 space-y-1">
+                {b.claims
+                  .filter((c) => `${c.category} ${c.text}`.toLowerCase().includes(needle))
+                  .slice(0, 2)
+                  .map((c) => (
+                    <li key={c.id} className="truncate text-xs text-accent-soft/90">
+                      → {c.text}
+                    </li>
+                  ))}
+              </ul>
+            )}
             {open && (
               <ul className="mt-4 space-y-2 border-t border-white/5 pt-4">
                 {b.claims.map((c) => (

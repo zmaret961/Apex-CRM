@@ -77,6 +77,22 @@ See `AGENTS.md` for the full rules.
 - **Focus** opens with a pipeline-at-a-glance strip; suggestions can be
   **snoozed 7 days** and restored inline.
 - **Accounts** exports the current filtered view to CSV in one click.
+- **Focus** also keeps competitors fresh: stale rival research raises a
+  "Refresh competitor intel" item.
+- The drawer's **deal value is editable** — click "unconfirmed" and type an
+  estimate; it logs to the timeline.
+- **Accounts** filters by any pipeline stage, open pipeline, or
+  not-in-pipeline.
+- **Focus** flags **stuck deals** — 14+ days in Engaged/Demo/Proposal with
+  no stage movement raises a "Re-engage" item.
+- **Research search** is full-text: claims, categories, and summaries, with
+  matching claims previewed inline.
+- **Focus** shows a **7-day activity digest** (moves / briefs / imports) and
+  a **Run research sweep** button with live progress — the sweep queues
+  research for every stale or unresearched account in one click.
+- The auto-import queue now holds **65 enterprises** (banks, trading firms,
+  health systems, consultancies) — import them from Automation with
+  "Import queue".
 
 ## Notes
 

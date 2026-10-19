@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Company, CompanyEvent, FocusItem, PipelineStage, ResearchBrief } from "@/lib/types";
 import { PIPELINE_STAGES } from "@/lib/types";
 import StatusPill from "./StatusPill";
@@ -39,6 +39,11 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [copied, setCopied] = useState(false);
   const [suggestion, setSuggestion] = useState<FocusItem | null>(null);
   const [acting, setActing] = useState(false);
+  const [editingValue, setEditingValue] = useState(false);
+  const [valueDraft, setValueDraft] = useState("");
+  const [removedStage, setRemovedStage] = useState<PipelineStage | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (companyId == null) {
@@ -46,6 +51,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
       return;
     }
     setAdded(false);
+    setRemovedStage(null);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
     fetch(`/api/companies/${companyId}`)
       .then((r) => r.json())
       .then((d) => {
@@ -94,7 +101,23 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   }
 
   async function removeFromPipeline() {
+    if (!company || company.pipelineStage == null) return;
+    const prev = company.pipelineStage;
     await patch({ pipelineStage: null });
+    setRemovedStage(prev);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoTimer.current = setTimeout(() => setRemovedStage(null), 6000);
+    onAdded?.();
+  }
+
+  async function undoRemove() {
+    if (!removedStage || restoring) return;
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    const stage = removedStage;
+    setRestoring(true);
+    await patch({ pipelineStage: stage });
+    setRestoring(false);
+    setRemovedStage(null);
     onAdded?.();
   }
 
@@ -128,6 +151,16 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setSavingNote(false);
   }
 
+  async function deleteNote(eventId: number) {
+    if (!company) return;
+    await fetch(`/api/companies/${company.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deleteNote: eventId }),
+    });
+    setEvents((es) => es.filter((e) => e.id !== eventId));
+  }
+
   async function copyOutreachBrief() {
     if (!company) return;
     const lines: string[] = [
@@ -135,7 +168,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
       ``,
       `- Status: ${company.status}${company.pipelineStage ? ` / ${company.pipelineStage}` : ""}`,
       `- Fit score: ${company.fitScore}/100`,
-      `- Industry: ${company.industry} · ${company.employees.toLocaleString()} employees`,
+      `- Industry: ${company.industry} · ${company.employees > 0 ? company.employees.toLocaleString() + " employees" : "size unconfirmed"}`,
       `- NYC office: ${company.address}`,
       `- Site: https://${company.domain}`,
       ``,
@@ -168,6 +201,15 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
 
   const open = companyId != null;
 
+  const researchAgeDays =
+    company?.lastResearchAt == null
+      ? null
+      : Math.floor(
+          (Date.now() -
+            new Date(company.lastResearchAt.replace(" ", "T") + "Z").getTime()) /
+            86400000
+        );
+
   return (
     <>
       {open && (
@@ -193,6 +235,12 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 >
                   {company.domain} ↗
                 </a>
+                <a
+                  href={`/?focus=${company.id}`}
+                  className="mt-0.5 block text-xs text-gray-500 hover:text-accent-soft"
+                >
+                  View on map ↗
+                </a>
               </div>
               <button
                 onClick={onClose}
@@ -214,6 +262,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 {copied ? "Copied ✓" : "Copy brief"}
               </button>
             </div>
+            <p className="-mt-3 text-[11px] text-gray-500">{fitRationale(company)}</p>
 
             {suggestion && (
               <div className="animate-fade-up rounded-xl border border-accent/25 bg-accent/8 p-3.5">
@@ -239,20 +288,62 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
 
             <div className="glass space-y-2 rounded-xl p-4 text-sm">
               <Row label="HQ / NYC office" value={company.address} />
-              <Row label="Employees" value={company.employees.toLocaleString()} />
+              <Row
+                label="Employees"
+                value={company.employees > 0 ? company.employees.toLocaleString() : "unconfirmed"}
+              />
               <Row label="Industry" value={company.industry} />
               <Row label="Funding" value={company.funding} />
-              <Row
-                label="Deal value"
-                value={company.estimatedValue ?? "unconfirmed"}
-                valueClass={company.estimatedValue ? "text-emerald-300" : "text-gray-500"}
-              />
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-gray-500">Deal value</span>
+                {editingValue ? (
+                  <input
+                    autoFocus
+                    value={valueDraft}
+                    onChange={(e) => setValueDraft(e.target.value)}
+                    onKeyDown={async (e) => {
+                      if (e.key === "Enter") {
+                        const v = valueDraft.trim();
+                        await patch({ estimatedValue: v === "" ? null : v });
+                        setEditingValue(false);
+                      } else if (e.key === "Escape") {
+                        setEditingValue(false);
+                      }
+                    }}
+                    onBlur={async () => {
+                      const v = valueDraft.trim();
+                      await patch({ estimatedValue: v === "" ? null : v });
+                      setEditingValue(false);
+                    }}
+                    placeholder="e.g. $120k est."
+                    className="w-40 rounded-md border border-accent/40 bg-transparent px-2 py-0.5 text-right text-sm text-white outline-none placeholder:text-gray-600"
+                  />
+                ) : (
+                  <button
+                    onClick={() => {
+                      setValueDraft(company.estimatedValue ?? "");
+                      setEditingValue(true);
+                    }}
+                    title="Click to set a deal estimate"
+                    className={`interactive -my-1 -mx-1 rounded px-2 py-1 text-right ${
+                      company.estimatedValue ? "text-emerald-300" : "text-gray-500 hover:text-gray-300"
+                    }`}
+                  >
+                    {company.estimatedValue ?? "unconfirmed — click to set"}
+                  </button>
+                )}
+              </div>
               <Row
                 label="Last research"
                 value={
                   company.lastResearchAt
-                    ? new Date(company.lastResearchAt).toLocaleDateString()
-                    : "Never"
+                    ? `${new Date(company.lastResearchAt.replace(" ", "T") + "Z").toLocaleDateString()}${
+                        researchAgeDays !== null && researchAgeDays > 30 ? " · stale" : ""
+                      }`
+                    : "Never — needs a brief"
+                }
+                valueClass={
+                  researchAgeDays === null || researchAgeDays > 30 ? "text-amber-300" : undefined
                 }
               />
             </div>
@@ -322,7 +413,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                   <p className="text-sm text-gray-600">No activity yet.</p>
                 )}
                 {events.map((e) => (
-                  <div key={e.id} className="flex gap-3 text-sm">
+                  <div key={e.id} className="group flex gap-3 text-sm">
                     <span
                       className={`mt-0.5 shrink-0 text-[10px] font-medium uppercase tracking-wide ${EVENT_TONE[e.type]}`}
                     >
@@ -334,17 +425,32 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                         {new Date(e.ts + "Z").toLocaleString()}
                       </p>
                     </div>
+                    {e.type === "note" && (
+                      <button
+                        onClick={() => deleteNote(e.id)}
+                        title="Delete note"
+                        className="interactive -my-1 shrink-0 self-start rounded px-1.5 py-0.5 text-xs text-gray-600 opacity-0 transition-opacity hover:text-rose-300 group-hover:opacity-100"
+                      >
+                        ×
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex items-center gap-2">
                 <input
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && saveNote()}
+                  maxLength={2000}
                   placeholder="Add a note — call outcome, next step…"
                   className="interactive flex-1 rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-sm outline-none placeholder:text-gray-600 focus:border-accent/50"
                 />
+                {note.length > 1800 && (
+                  <span className="text-[10px] tabular-nums text-amber-300/80">
+                    {2000 - note.length}
+                  </span>
+                )}
                 <button
                   onClick={saveNote}
                   disabled={!note.trim() || savingNote}
@@ -377,19 +483,29 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
               </section>
             )}
 
+            {company.status === "competitor" && company.pipelineStage == null ? (
+              <div className="w-full rounded-xl border border-rose-400/20 bg-rose-400/5 py-2.5 text-center text-sm text-rose-300/80">
+                Competitor — intel only
+              </div>
+            ) : (
             <button
               onClick={addToPipeline}
               disabled={adding || added || company.pipelineStage != null}
               className="interactive w-full rounded-xl border border-accent/40 bg-accent/15 py-2.5 text-sm font-medium text-accent-soft hover:bg-accent/25 disabled:cursor-default disabled:border-emerald-400/30 disabled:bg-emerald-400/10 disabled:text-emerald-300"
             >
               {company.pipelineStage != null
-                ? `In pipeline — ${company.pipelineStage}`
+                ? `In pipeline — ${company.pipelineStage}${
+                    company.stageChangedAt
+                      ? ` · ${Math.max(0, Math.floor((Date.now() - new Date(company.stageChangedAt + "Z").getTime()) / 86400000))}d`
+                      : ""
+                  }`
                 : added
                 ? "✓ Added to Opportunities"
                 : adding
                 ? "Adding…"
                 : "Add to Opportunities"}
             </button>
+            )}
             {company.pipelineStage != null && nextStage(company.pipelineStage) && (
               <button
                 onClick={() => patch({ pipelineStage: nextStage(company.pipelineStage!) })}
@@ -406,11 +522,37 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 Remove from pipeline
               </button>
             )}
+            {company.pipelineStage == null && removedStage != null && (
+              <button
+                onClick={undoRemove}
+                disabled={restoring}
+                className="interactive -mt-3 w-full rounded-xl border border-amber-400/30 bg-amber-400/10 py-2 text-xs font-medium text-amber-300 hover:bg-amber-400/20"
+              >
+                {restoring ? "Restoring…" : `Removed from pipeline — Undo (was ${removedStage})`}
+              </button>
+            )}
           </div>
         )}
       </aside>
     </>
   );
+}
+
+const TARGET_VERTICALS = new Set([
+  "Finance", "Fintech", "Data Infrastructure", "Dev Tools", "Security", "AI / ML", "Enterprise Software",
+]);
+
+// Explains the fit score using only fields already on the record — a
+// derived rationale, not a factual claim, so no citation is needed.
+function fitRationale(c: Company): string {
+  const parts: string[] = [];
+  if (c.employees >= 10000) parts.push("very large eng org");
+  else if (c.employees >= 1000) parts.push("large eng org");
+  if (TARGET_VERTICALS.has(c.industry)) parts.push("target vertical");
+  if (c.signals.length >= 3) parts.push("rich public signals");
+  if (c.fitScore >= 85) parts.push("top-tier Devin fit");
+  else if (c.fitScore >= 60) parts.push("solid Devin fit");
+  return parts.length ? `Why ${c.fitScore}: ${parts.join(" · ")}` : "Limited public signals — fit is provisional.";
 }
 
 function nextStage(stage: PipelineStage): PipelineStage | null {

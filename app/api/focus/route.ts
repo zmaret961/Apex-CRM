@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { intelSummary, pipelineCounts, suggestedActions } from "@/lib/queries";
+import { intelSummary, pipelineCounts, suggestedActions, weeklyDigest } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -8,5 +8,6 @@ export function GET() {
     items: suggestedActions(12),
     intel: intelSummary(),
     pipeline: pipelineCounts(),
+    digest: weeklyDigest(),
   });
 }
