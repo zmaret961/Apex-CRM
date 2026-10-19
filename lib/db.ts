@@ -4,6 +4,7 @@ import fs from "fs";
 import os from "os";
 import {
   COMPANIES,
+  COMPANIES_V5,
   DISCOVERED_COMPANIES,
   DISCOVERED_COMPANIES_V2,
   DISCOVERED_COMPANIES_V3,
@@ -103,7 +104,7 @@ function seed(db: Database.Database) {
     `INSERT INTO research_claims (briefId, category, text, sourceUrl) VALUES (?, ?, ?, ?)`
   );
 
-  const all = [...COMPANIES, ...DISCOVERED_COMPANIES];
+  const all = [...COMPANIES, ...COMPANIES_V5, ...DISCOVERED_COMPANIES];
   const byName = new Map<string, number>();
   const tx = db.transaction(() => {
     for (const c of all) {
@@ -167,16 +168,17 @@ function applyDataMigrations(db: Database.Database) {
     tx();
     db.pragma("user_version = 2");
   }
-  const insertDiscovered = (batch: SeedCompany[]) => {
+  const insertDiscovered = (batch: SeedCompany[], discovered = 1) => {
     const insert = db.prepare(
       `INSERT INTO companies (name, domain, industry, address, lat, lng, employees, funding, status, fitScore, pipelineStage, estimatedValue, lastResearchAt, description, sources, signals, discovered)
-       SELECT @name, @domain, @industry, @address, @lat, @lng, @employees, @funding, @status, @fitScore, NULL, NULL, NULL, @description, @sources, @signals, 1
+       SELECT @name, @domain, @industry, @address, @lat, @lng, @employees, @funding, @status, @fitScore, NULL, NULL, NULL, @description, @sources, @signals, @discovered
        WHERE NOT EXISTS (SELECT 1 FROM companies WHERE domain = @domain)`
     );
     const tx = db.transaction(() => {
       for (const c of batch) {
         insert.run({
           ...c,
+          discovered,
           sources: JSON.stringify(c.sources ?? []),
           signals: JSON.stringify(c.signals ?? []),
         });
@@ -198,5 +200,18 @@ function applyDataMigrations(db: Database.Database) {
     // Batch 4 — more NYC HQs: banks/insurers, media groups, utility.
     insertDiscovered(DISCOVERED_COMPANIES_V4);
     db.pragma("user_version = 5");
+  }
+  if (v < 6) {
+    // Remove batch-4 queue duplicates of companies already tracked under a
+    // different domain spelling (Marsh McLennan, New York Life, Estée Lauder,
+    // Fox Corp) — dedupe is by domain, so the name-spelling variants slipped in.
+    db.prepare(
+      `DELETE FROM companies
+       WHERE discovered = 1 AND domain IN ('mmmc.com','nylife.com','fox.com','esteelauder.com')`
+    ).run();
+    // Batch 5 — real estate, publishing, luxury, insurance, health + adtech
+    // enterprises; tracked directly (not queued).
+    insertDiscovered(COMPANIES_V5, 0);
+    db.pragma("user_version = 6");
   }
 }
