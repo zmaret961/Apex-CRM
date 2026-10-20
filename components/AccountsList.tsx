@@ -24,6 +24,9 @@ export default function AccountsList() {
   const [selected, setSelected] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkNote, setBulkNote] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // "/" jumps to search — the standard list-page shortcut.
@@ -99,11 +102,11 @@ export default function AccountsList() {
     return () => clearTimeout(t);
   }, [q, industry, status, stage, sort, refreshKey]);
 
-  function exportCsv() {
+  function exportCsv(list: Company[] = companies) {
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const rows = [
       ["name", "domain", "industry", "status", "pipelineStage", "fitScore", "employees", "funding", "estimatedValue", "address", "lastResearchAt"],
-      ...companies.map((c) => [
+      ...list.map((c) => [
         c.name, c.domain, c.industry, c.status, c.pipelineStage ?? "", c.fitScore,
         c.employees, c.funding, c.estimatedValue ?? "unconfirmed", c.address,
         c.lastResearchAt ?? "",
@@ -117,6 +120,45 @@ export default function AccountsList() {
     a.download = "apex-accounts.csv";
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  function toggleCheck(id: number) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleCheckAll() {
+    setChecked((prev) =>
+      prev.size === companies.length && companies.length > 0
+        ? new Set()
+        : new Set(companies.map((c) => c.id))
+    );
+  }
+
+  async function bulkPatch(body: Record<string, unknown>, done: string) {
+    setBulkBusy(true);
+    setBulkNote(null);
+    const results = await Promise.all(
+      [...checked].map((id) =>
+        fetch(`/api/companies/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then((r) => r.ok)
+      )
+    );
+    const ok = results.filter(Boolean).length;
+    const skipped = results.length - ok;
+    setBulkBusy(false);
+    setBulkNote(
+      `${done.replace("%d", String(ok))}${skipped ? ` · ${skipped} skipped` : ""}`
+    );
+    setChecked(new Set());
+    setRefreshKey((k) => k + 1);
   }
 
   return (
@@ -172,7 +214,7 @@ export default function AccountsList() {
           <option value="employees">Sort: size</option>
         </select>
         <button
-          onClick={exportCsv}
+          onClick={() => exportCsv()}
           title="Download the current view as CSV"
           className="interactive rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-gray-400 hover:border-accent/40 hover:text-white"
         >
@@ -185,8 +227,18 @@ export default function AccountsList() {
         >
           + Add company
         </button>
+        <label className="interactive flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 px-2 py-1.5 text-xs text-gray-400 hover:border-accent/40" title="Select every account in this view">
+          <input
+            type="checkbox"
+            checked={companies.length > 0 && checked.size === companies.length}
+            onChange={toggleCheckAll}
+            className="accent-accent"
+          />
+          All
+        </label>
         <span className="ml-auto text-xs text-gray-500">
           {companies.length} accounts
+          {checked.size > 0 && <span className="text-accent-soft"> · {checked.size} selected</span>}
           {selected != null && <span className="text-gray-600"> · ↑↓ steps through profiles</span>}
         </span>
       </div>
@@ -208,8 +260,18 @@ export default function AccountsList() {
           <button
             key={c.id}
             onClick={() => setSelected(c.id)}
-            className="glass interactive group rounded-2xl p-4 text-left"
+            className="glass interactive group relative rounded-2xl p-4 text-left"
           >
+            <input
+              type="checkbox"
+              checked={checked.has(c.id)}
+              onChange={() => toggleCheck(c.id)}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Select ${c.name}`}
+              className={`absolute right-3 top-3 accent-accent ${
+                checked.has(c.id) ? "" : "opacity-0 transition-opacity group-hover:opacity-100"
+              }`}
+            />
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="font-medium text-white group-hover:text-accent-soft">
@@ -233,6 +295,46 @@ export default function AccountsList() {
           </button>
         ))}
       </div>
+      {checked.size > 0 && (
+        <div className="glass-deep animate-fade-up fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-xl px-4 py-3 text-sm shadow-glow">
+          <span className="font-medium text-white">{checked.size} selected</span>
+          <button
+            disabled={bulkBusy}
+            onClick={() => bulkPatch({ pipelineStage: "Identified" }, "Added %d to pipeline")}
+            className="interactive rounded-lg border border-accent/40 bg-accent/15 px-2.5 py-1 text-xs font-medium text-accent-soft disabled:opacity-40"
+          >
+            Add to pipeline
+          </button>
+          <button
+            disabled={bulkBusy}
+            onClick={() => bulkPatch({ status: "researched" }, "Marked %d researched")}
+            className="interactive rounded-lg border border-white/15 px-2.5 py-1 text-xs text-gray-300 disabled:opacity-40"
+          >
+            Mark researched
+          </button>
+          <button
+            disabled={bulkBusy}
+            onClick={() => exportCsv(companies.filter((c) => checked.has(c.id)))}
+            className="interactive rounded-lg border border-white/15 px-2.5 py-1 text-xs text-gray-300 disabled:opacity-40"
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={() => setChecked(new Set())}
+            className="interactive rounded-lg border border-white/10 px-2.5 py-1 text-xs text-gray-500"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+      {bulkNote && (
+        <div
+          onClick={() => setBulkNote(null)}
+          className="glass-deep animate-fade-up fixed bottom-6 left-1/2 z-50 -translate-x-1/2 cursor-pointer rounded-xl px-5 py-3 text-sm text-gray-300 shadow-glow"
+        >
+          {bulkNote}
+        </div>
+      )}
       <CompanyDrawer companyId={selected} onClose={() => setSelected(null)} />
       {adding && (
         <AddCompanyModal
