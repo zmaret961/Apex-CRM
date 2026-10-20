@@ -3,28 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import type { Company } from "@/lib/types";
+import { heat } from "@/lib/heat";
 import CompanyDrawer from "./CompanyDrawer";
 import FitScore from "./FitScore";
 import StatusPill from "./StatusPill";
-
-const STAGE_HEAT: Record<string, number> = {
-  Identified: 2,
-  Researched: 4,
-  Engaged: 9,
-  "Demo Scheduled": 14,
-  Proposal: 18,
-  "Closed Won": -100,
-  "Closed Lost": -100,
-};
-
-function heat(c: Company): number {
-  let h = c.fitScore;
-  h += Math.min(c.signals.length * 4, 16);
-  h += STAGE_HEAT[c.pipelineStage ?? ""] ?? 0;
-  if (c.status === "customer") h -= 100;
-  if (c.status === "competitor") h -= 100;
-  return h;
-}
 
 function whyHot(c: Company): string {
   if (c.pipelineStage === "Proposal") return "In proposal — push it over the line.";
