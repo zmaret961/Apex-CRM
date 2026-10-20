@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Company, CompanyEvent, Contact, FocusItem, PipelineStage, ResearchBrief } from "@/lib/types";
+import type { Company, CompanyEvent, Contact, Exec, FocusItem, PipelineStage, ResearchBrief } from "@/lib/types";
 import { PIPELINE_STAGES } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import FitScore from "./FitScore";
@@ -33,9 +33,15 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [briefs, setBriefs] = useState<ResearchBrief[]>([]);
   const [events, setEvents] = useState<CompanyEvent[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [execs, setExecs] = useState<Exec[]>([]);
   const [showContactForm, setShowContactForm] = useState(false);
   const [contactDraft, setContactDraft] = useState({ name: "", role: "", url: "" });
   const [savingContact, setSavingContact] = useState(false);
+  const [showRoi, setShowRoi] = useState(false);
+  const [engCount, setEngCount] = useState(0);
+  const [avgComp, setAvgComp] = useState(185000);
+  const [hoursSaved, setHoursSaved] = useState(5);
+  const [outreach, setOutreach] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
   const [note, setNote] = useState("");
@@ -66,6 +72,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
         setBriefs(d.briefs ?? []);
         setEvents(d.events ?? []);
         setContacts(d.contacts ?? []);
+        setExecs(d.execs ?? []);
       });
     fetch("/api/focus")
       .then((r) => r.json())
@@ -97,6 +104,47 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setCompany(d.company);
     setEvents(d.events ?? []);
     setContacts(d.contacts ?? []);
+    setExecs(d.execs ?? []);
+  }
+
+  function draftOutreach() {
+    if (!company) return;
+    const champion = contacts.find((c) => c.champion) ?? contacts[0];
+    const firstName = champion ? champion.name.split(" ")[0] : "there";
+    const exec = execs.find((e) => /cto|chief techn|engineering/i.test(e.role)) ?? execs[0];
+    const hook =
+      company.signals[0]?.text ?? briefs[0]?.whyNow ?? `${company.industry} engineering at scale`;
+    const who = exec ? `${exec.name} (${exec.role})` : `your ${company.industry.toLowerCase()} eng org`;
+    const text = [
+      `Subject: ${company.name} — more eng output without more headcount`,
+      ``,
+      `Hi ${firstName},`,
+      ``,
+      `${hook} — which is why I thought of ${company.name}. ${who} is exactly who we built Devin for: an autonomous software engineer that takes scoped tickets end-to-end (PRs, migrations, test fixes) so senior engineers stay on roadmap work.`,
+      ``,
+      `NYC customers like Goldman Sachs run it on real backlog today. Every claim I send cites a source — happy to share the enterprise playbook.`,
+      ``,
+      `20 minutes this week?`,
+      ``,
+      `Zachary`,
+    ].join("\n");
+    setOutreach(text);
+  }
+
+  async function copyOutreach() {
+    if (!outreach) return;
+    try {
+      await navigator.clipboard.writeText(outreach);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = outreach;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   async function saveContact() {
@@ -329,7 +377,38 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
               >
                 {copied ? "Copied ✓" : "Copy brief"}
               </button>
+              <button
+                onClick={draftOutreach}
+                className="interactive rounded-lg border border-accent/40 bg-accent/15 px-2.5 py-1 text-xs font-medium text-accent-soft"
+                title="Draft a personalized outreach email from this account's signals"
+              >
+                Draft outreach
+              </button>
             </div>
+            {outreach !== null && (
+              <div className="-mt-2 animate-fade-up rounded-xl border border-accent/25 bg-accent/8 p-3.5">
+                <textarea
+                  value={outreach}
+                  onChange={(e) => setOutreach(e.target.value)}
+                  rows={14}
+                  className="interactive w-full resize-y rounded-lg border border-white/10 bg-black/20 p-3 font-mono text-[11px] leading-relaxed text-gray-300 outline-none focus:border-accent/50"
+                />
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    onClick={copyOutreach}
+                    className="interactive rounded-lg border border-accent/40 bg-accent/15 px-2.5 py-1 text-xs font-medium text-accent-soft"
+                  >
+                    {copied ? "Copied ✓" : "Copy"}
+                  </button>
+                  <button
+                    onClick={() => setOutreach(null)}
+                    className="interactive rounded-lg border border-white/10 px-2.5 py-1 text-xs text-gray-400"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            )}
             <p className="-mt-3 text-[11px] text-gray-500">{fitRationale(company)}</p>
 
             {suggestion && (
@@ -353,6 +432,59 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
             )}
 
             <p className="text-sm leading-relaxed text-gray-300">{company.description}</p>
+
+            <section>
+              <button
+                onClick={() => {
+                  setShowRoi(!showRoi);
+                  if (!engCount) setEngCount(Math.max(50, Math.round((company.employees || 500) * 0.2)));
+                }}
+                className="mb-2 flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wider text-gray-500 hover:text-gray-300"
+              >
+                ROI estimate {showRoi ? "▾" : "▸"}
+                {!showRoi && (
+                  <span className="normal-case text-emerald-300/80">
+                    ~{fmtMoney(roiValue(engCount || Math.max(50, Math.round((company.employees || 500) * 0.2)), avgComp, hoursSaved))}/yr
+                  </span>
+                )}
+              </button>
+              {showRoi && (
+                <div className="glass animate-fade-up space-y-3 rounded-xl p-4 text-sm">
+                  <RoiRow label="Engineers" value={engCount} set={setEngCount} min={10} max={20000} step={10} fmt={(v) => v.toLocaleString()} />
+                  <RoiRow label="Avg fully-loaded comp" value={avgComp} set={setAvgComp} min={80000} max={400000} step={5000} fmt={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <RoiRow label="Hours saved / dev / wk" value={hoursSaved} set={setHoursSaved} min={1} max={15} step={0.5} fmt={(v) => `${v}h`} />
+                  <div className="border-t border-white/10 pt-2 text-right">
+                    <p className="text-lg font-semibold text-emerald-300">
+                      {fmtMoney(roiValue(engCount, avgComp, hoursSaved))}/yr
+                    </p>
+                    <p className="text-[11px] text-gray-500">
+                      {(engCount * hoursSaved * 48).toLocaleString()} dev-hours back · estimate, not a quote
+                    </p>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {execs.length > 0 && (
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Leadership
+                </h3>
+                <div className="glass rounded-xl p-4">
+                  <OrgNode exec={execs[0]} company={company.name} head />
+                  {execs.length > 1 && (
+                    <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/5 pt-3">
+                      {execs.slice(1).map((e) => (
+                        <OrgNode key={e.id} exec={e} company={company.name} />
+                      ))}
+                    </div>
+                  )}
+                  <p className="mt-3 text-[10px] text-gray-600">
+                    Public leadership — verify before outreach.
+                  </p>
+                </div>
+              </section>
+            )}
 
             <div className="glass space-y-2 rounded-xl p-4 text-sm">
               <Row label="HQ / NYC office" value={company.address} />
@@ -763,5 +895,75 @@ function Row({ label, value, valueClass }: { label: string; value: string; value
       <span className="shrink-0 text-gray-500">{label}</span>
       <span className={`${valueClass ?? "text-gray-200"} text-right`}>{value}</span>
     </div>
+  );
+}
+
+function fmtMoney(v: number): string {
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `$${Math.round(v / 1_000)}k`;
+  return `$${Math.round(v)}`;
+}
+
+// engCount * hoursSaved/wk * 48 wk * hourly rate (comp / 2080h)
+function roiValue(engCount: number, avgComp: number, hoursSaved: number): number {
+  return engCount * hoursSaved * 48 * (avgComp / 2080);
+}
+
+function RoiRow({
+  label,
+  value,
+  set,
+  min,
+  max,
+  step,
+  fmt,
+}: {
+  label: string;
+  value: number;
+  set: (v: number) => void;
+  min: number;
+  max: number;
+  step: number;
+  fmt: (v: number) => string;
+}) {
+  return (
+    <label className="flex items-center gap-3">
+      <span className="w-40 shrink-0 text-gray-500">{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => set(Number(e.target.value))}
+        className="interactive h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-white/10 accent-accent-soft"
+      />
+      <span className="w-16 shrink-0 text-right text-gray-200 tabular-nums">{fmt(value)}</span>
+    </label>
+  );
+}
+
+function linkedinSearch(name: string, company: string): string {
+  return `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(
+    `${name} ${company}`
+  )}`;
+}
+
+function OrgNode({ exec, company, head }: { exec: Exec; company: string; head?: boolean }) {
+  return (
+    <a
+      href={linkedinSearch(exec.name, company)}
+      target="_blank"
+      rel="noreferrer"
+      title={`${exec.name} — ${exec.role} · find on LinkedIn`}
+      className={`interactive block rounded-lg border p-2.5 ${
+        head
+          ? "border-accent/30 bg-accent/10 text-center"
+          : "border-white/10 bg-white/[0.03]"
+      }`}
+    >
+      <p className={`font-medium text-white ${head ? "text-sm" : "text-xs"}`}>{exec.name}</p>
+      <p className={`${head ? "text-xs" : "text-[11px]"} text-gray-400`}>{exec.role}</p>
+    </a>
   );
 }

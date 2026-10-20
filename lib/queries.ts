@@ -3,6 +3,7 @@ import { PIPELINE_STAGES } from "./types";
 import type {
   Company,
   Contact,
+  Exec,
   SearchHit,
   CompanyEvent,
   CompanyStatus,
@@ -167,6 +168,13 @@ export function eventsFor(companyId: number): CompanyEvent[] {
   return db
     .prepare("SELECT * FROM company_events WHERE companyId = ? ORDER BY id DESC LIMIT 50")
     .all(companyId) as CompanyEvent[];
+}
+
+export function execsFor(companyId: number): Exec[] {
+  const db = getDb();
+  return db
+    .prepare("SELECT * FROM execs WHERE companyId = ? ORDER BY id ASC LIMIT 12")
+    .all(companyId) as Exec[];
 }
 
 export function contactsFor(companyId: number): Contact[] {

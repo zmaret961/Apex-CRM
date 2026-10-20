@@ -7,6 +7,7 @@ import {
   deleteContact,
   deleteNote,
   eventsFor,
+  execsFor,
   getCompany,
   isCompanyStatus,
   isPipelineStage,
@@ -27,6 +28,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     briefs: briefsFor(company.id),
     events: eventsFor(company.id),
     contacts: contactsFor(company.id),
+    execs: execsFor(company.id),
   });
 }
 

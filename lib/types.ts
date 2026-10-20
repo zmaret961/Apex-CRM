@@ -75,6 +75,13 @@ export interface JobStatus {
   items: { companyId: number; name: string; state: "queued" | "running" | "done" | "failed" }[];
 }
 
+export interface Exec {
+  id: number;
+  companyId: number;
+  name: string;
+  role: string;
+}
+
 export interface Contact {
   id: number;
   companyId: number;
