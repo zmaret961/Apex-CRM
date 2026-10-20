@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Company, CompanyEvent, Contact, Exec, FocusItem, PipelineStage, ResearchBrief } from "@/lib/types";
+import type { Company, CompanyEvent, Contact, Exec, FocusItem, PipelineStage, ResearchBrief, Sequence } from "@/lib/types";
 import { PIPELINE_STAGES } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import FitScore from "./FitScore";
@@ -34,6 +34,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [events, setEvents] = useState<CompanyEvent[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [execs, setExecs] = useState<Exec[]>([]);
+  const [sequence, setSequence] = useState<Sequence | null>(null);
   const [showContactForm, setShowContactForm] = useState(false);
   const [contactDraft, setContactDraft] = useState({ name: "", role: "", url: "" });
   const [savingContact, setSavingContact] = useState(false);
@@ -64,6 +65,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setAdded(false);
     setRemovedStage(null);
     setAdvancedFrom(null);
+    setSequence(null);
     if (undoTimer.current) clearTimeout(undoTimer.current);
     fetch(`/api/companies/${companyId}`)
       .then((r) => r.json())
@@ -73,6 +75,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
         setEvents(d.events ?? []);
         setContacts(d.contacts ?? []);
         setExecs(d.execs ?? []);
+        setSequence(d.sequence ?? null);
       });
     fetch("/api/focus")
       .then((r) => r.json())
@@ -105,6 +108,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setEvents(d.events ?? []);
     setContacts(d.contacts ?? []);
     setExecs(d.execs ?? []);
+    setSequence(d.sequence ?? null);
   }
 
   function draftOutreach() {
@@ -485,6 +489,60 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 </div>
               </section>
             )}
+
+            <section>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Outreach sequence
+                </h3>
+                {sequence && (
+                  <button
+                    onClick={() => patch({ endSequence: true })}
+                    title="End and remove this sequence"
+                    className="interactive rounded px-1.5 py-0.5 text-[11px] text-gray-600 hover:text-gray-300"
+                  >
+                    End
+                  </button>
+                )}
+              </div>
+              {sequence ? (
+                <div className="glass rounded-xl p-3">
+                  <div className="mb-2 flex items-center justify-between px-1 text-[11px] text-gray-500">
+                    <span>
+                      {sequence.steps.filter((s) => s.done).length}/{sequence.steps.length} touches done
+                    </span>
+                    <span>started {new Date(sequence.startedAt.replace(" ", "T") + "Z").toLocaleDateString()}</span>
+                  </div>
+                  <ol className="space-y-1">
+                    {sequence.steps.map((s, i) => (
+                      <li key={i}>
+                        <label className="interactive flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-white/[0.03]">
+                          <input
+                            type="checkbox"
+                            checked={s.done}
+                            onChange={(e) =>
+                              patch({ sequenceStep: { index: i, done: e.target.checked } })
+                            }
+                            className="shrink-0 accent-accent"
+                          />
+                          <span className="w-10 shrink-0 text-[11px] text-gray-600">Day {s.day}</span>
+                          <span className={s.done ? "text-gray-600 line-through" : "text-gray-300"}>
+                            {s.label}
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              ) : (
+                <button
+                  onClick={() => patch({ startSequence: true })}
+                  className="interactive w-full rounded-xl border border-dashed border-white/15 px-3 py-2.5 text-left text-sm text-gray-400 hover:border-accent/40 hover:text-gray-200"
+                >
+                  Start a 5-touch sequence — email → LinkedIn → follow-up → value-add → break-up
+                </button>
+              )}
+            </section>
 
             <div className="glass space-y-2 rounded-xl p-4 text-sm">
               <Row label="HQ / NYC office" value={company.address} />

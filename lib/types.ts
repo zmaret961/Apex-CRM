@@ -82,6 +82,19 @@ export interface Exec {
   role: string;
 }
 
+export interface SequenceStep {
+  day: number;
+  label: string;
+  done: boolean;
+  doneAt?: string | null;
+}
+
+export interface Sequence {
+  companyId: number;
+  startedAt: string;
+  steps: SequenceStep[];
+}
+
 export interface Contact {
   id: number;
   companyId: number;

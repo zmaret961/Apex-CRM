@@ -13,6 +13,7 @@ import type {
   PipelineStage,
   FocusItem,
   IntelSummary,
+  Sequence,
 } from "./types";
 
 export const VALID_STATUSES: CompanyStatus[] = ["customer", "prospect", "researched", "competitor"];
@@ -223,6 +224,52 @@ export function setContactChampion(companyId: number, contactId: number, champio
     contactId,
     companyId
   );
+}
+
+const SEQUENCE_TEMPLATE = [
+  { day: 0, label: "Send personalized email" },
+  { day: 3, label: "LinkedIn touch — connect and reference their signal" },
+  { day: 7, label: "Follow-up — share the research brief" },
+  { day: 12, label: "Value-add — send the ROI estimate" },
+  { day: 21, label: "Break-up email — close the loop" },
+];
+
+export function sequenceFor(companyId: number): Sequence | null {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT * FROM sequences WHERE companyId = ?")
+    .get(companyId) as { companyId: number; startedAt: string; steps: string } | undefined;
+  if (!row) return null;
+  return { companyId: row.companyId, startedAt: row.startedAt, steps: JSON.parse(row.steps) };
+}
+
+export function startSequence(companyId: number) {
+  const db = getDb();
+  const steps = SEQUENCE_TEMPLATE.map((s) => ({ ...s, done: false, doneAt: null }));
+  db.prepare(
+    "INSERT OR REPLACE INTO sequences (companyId, startedAt, steps) VALUES (?, datetime('now'), ?)"
+  ).run(companyId, JSON.stringify(steps));
+  addEvent(companyId, "note", `Outreach sequence started (${SEQUENCE_TEMPLATE.length} touches)`);
+}
+
+export function setSequenceStep(companyId: number, index: number, done: boolean): boolean {
+  const seq = sequenceFor(companyId);
+  if (!seq || index < 0 || index >= seq.steps.length) return false;
+  seq.steps[index].done = done;
+  seq.steps[index].doneAt = done ? new Date().toISOString() : null;
+  const db = getDb();
+  db.prepare("UPDATE sequences SET steps = ? WHERE companyId = ?").run(
+    JSON.stringify(seq.steps),
+    companyId
+  );
+  addEvent(companyId, "note", `Sequence touch ${done ? "done" : "reopened"}: ${seq.steps[index].label}`);
+  return true;
+}
+
+export function endSequence(companyId: number) {
+  const db = getDb();
+  const r = db.prepare("DELETE FROM sequences WHERE companyId = ?").run(companyId);
+  if (r.changes > 0) addEvent(companyId, "note", "Outreach sequence ended");
 }
 
 export function markResearched(id: number) {

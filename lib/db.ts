@@ -102,6 +102,11 @@ function migrate(db: Database.Database) {
       name TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT ''
     );
+    CREATE TABLE IF NOT EXISTS sequences (
+      companyId INTEGER PRIMARY KEY REFERENCES companies(id),
+      startedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      steps TEXT NOT NULL DEFAULT '[]'
+    );
     CREATE INDEX IF NOT EXISTS idx_briefs_company ON research_briefs(companyId);
     CREATE INDEX IF NOT EXISTS idx_claims_brief ON research_claims(briefId);
     CREATE INDEX IF NOT EXISTS idx_log_ts ON activity_log(ts DESC);
