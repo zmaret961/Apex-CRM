@@ -45,10 +45,15 @@ required — the map uses the free CARTO dark basemap.
 |---|---|
 | `/` | Full-viewport map, clustered glowing pins, live filters, company drawer. Deep link: `/?focus=<id>` flies to a pin and opens its drawer |
 | `/focus` | Next-best-action queue: Apex tells you what to do next — refresh stale research, advance ready deals, research top-fit accounts. Includes the competitive-surface rollup |
+| `/hot-leads` | The book ranked by heat: fit score + buying signals + pipeline momentum, tiered Scorching/Hot/Warm, one-click to pipeline |
 | `/accounts` | Searchable card list of every account. Deep link: `/accounts?open=<id>` |
 | `/opportunities` | Kanban: Identified → Researched → Engaged → Demo Scheduled → Proposal → Closed Won/Lost. Cards show days-in-stage; click for the drawer, or advance a stage from the drawer |
 | `/research` | Feed of agent briefs; every claim cites a source. Filter by company/category; one-click promote to pipeline |
 | `/automation` | Agent console: run sweeps, import discovered enterprises, live activity log |
+| `/integrations` | Plug-in surface: 22 demo connectors (Salesforce, Sales Nav, Apollo, Outreach, Slack, Gong…) with connect/disconnect that persists locally |
+
+Design research that shaped Apex: [`docs/WORLDS-BEST-CRM.md`](docs/WORLDS-BEST-CRM.md) —
+what makes the world's best CRM and how Apex borrows it.
 
 ## Data honesty
 

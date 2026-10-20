@@ -75,6 +75,17 @@ export interface JobStatus {
   items: { companyId: number; name: string; state: "queued" | "running" | "done" | "failed" }[];
 }
 
+export interface Contact {
+  id: number;
+  companyId: number;
+  name: string;
+  role: string;
+  url: string;
+  notes: string;
+  champion: number;
+  createdAt: string;
+}
+
 export interface CompanyEvent {
   id: number;
   companyId: number;

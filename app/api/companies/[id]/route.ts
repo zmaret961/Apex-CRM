@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  addContact,
   addEvent,
   briefsFor,
+  contactsFor,
+  deleteContact,
   deleteNote,
   eventsFor,
   getCompany,
   isCompanyStatus,
   isPipelineStage,
+  setContactChampion,
   updatePipeline,
   setStatus,
   setEstimatedValue,
@@ -18,7 +22,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const company = getCompany(Number(id));
   if (!company) return NextResponse.json({ error: "not found" }, { status: 404 });
-  return NextResponse.json({ company, briefs: briefsFor(company.id), events: eventsFor(company.id) });
+  return NextResponse.json({
+    company,
+    briefs: briefsFor(company.id),
+    events: eventsFor(company.id),
+    contacts: contactsFor(company.id),
+  });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -83,5 +92,34 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     deleteNote(companyId, eventId);
   }
-  return NextResponse.json(getCompany(companyId));
+  if ("contact" in body) {
+    const c = body.contact;
+    if (!c || typeof c !== "object" || typeof c.name !== "string" || !c.name.trim()) {
+      return NextResponse.json({ error: "contact.name is required" }, { status: 400 });
+    }
+    const clip = (v: unknown, max: number) =>
+      typeof v === "string" ? v.trim().slice(0, max) : "";
+    addContact(companyId, {
+      name: clip(c.name, 120),
+      role: clip(c.role, 160),
+      url: clip(c.url, 500),
+      notes: clip(c.notes, 500),
+      champion: c.champion === true,
+    });
+  }
+  if ("deleteContact" in body) {
+    const contactId = Number(body.deleteContact);
+    if (!Number.isInteger(contactId) || contactId <= 0) {
+      return NextResponse.json({ error: "deleteContact must be a contact id" }, { status: 400 });
+    }
+    deleteContact(companyId, contactId);
+  }
+  if ("championContact" in body) {
+    const contactId = Number(body.championContact);
+    if (!Number.isInteger(contactId) || contactId <= 0) {
+      return NextResponse.json({ error: "championContact must be a contact id" }, { status: 400 });
+    }
+    setContactChampion(companyId, contactId, body.champion !== false);
+  }
+  return NextResponse.json({ company: getCompany(companyId), contacts: contactsFor(companyId) });
 }
