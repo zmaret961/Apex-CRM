@@ -13,6 +13,25 @@ const INDUSTRIES = [
   "Healthcare", "Real Estate", "Big Tech",
 ];
 
+const FILTERS_KEY = "apex-accounts-filters";
+
+function loadFilters(): { q: string; industry: string; status: string; stage: string; sort: "fit" | "name" | "employees" } {
+  const empty = { q: "", industry: "", status: "", stage: "", sort: "fit" as const };
+  try {
+    const raw = JSON.parse(localStorage.getItem(FILTERS_KEY) ?? "null");
+    if (!raw || typeof raw !== "object") return empty;
+    return {
+      q: typeof raw.q === "string" ? raw.q : "",
+      industry: typeof raw.industry === "string" ? raw.industry : "",
+      status: typeof raw.status === "string" ? raw.status : "",
+      stage: typeof raw.stage === "string" ? raw.stage : "",
+      sort: ["fit", "name", "employees"].includes(raw.sort) ? raw.sort : "fit",
+    };
+  } catch {
+    return empty;
+  }
+}
+
 export default function AccountsList() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -47,6 +66,22 @@ export default function AccountsList() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Restore the seller's last view — pick up where you left off.
+  useEffect(() => {
+    const f = loadFilters();
+    setQ(f.q);
+    setIndustry(f.industry);
+    setStatus(f.status);
+    setStage(f.stage);
+    setSort(f.sort);
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FILTERS_KEY, JSON.stringify({ q, industry, status, stage, sort }));
+    } catch { /* storage unavailable */ }
+  }, [q, industry, status, stage, sort]);
 
   // Deep link: /accounts?open=<id> opens the shared company drawer.
   //            /accounts?add=1 opens the Add company modal (⌘K action).
@@ -171,6 +206,20 @@ export default function AccountsList() {
           placeholder="Search companies… ( / )"
           className="interactive w-56 rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-sm outline-none placeholder:text-gray-600 focus:border-accent/50"
         />
+        {(q || industry || status || stage) && (
+          <button
+            onClick={() => {
+              setQ("");
+              setIndustry("");
+              setStatus("");
+              setStage("");
+            }}
+            title="Clear all filters"
+            className="interactive rounded-lg border border-white/10 px-2 py-1.5 text-xs text-gray-500 hover:border-accent/40 hover:text-gray-300"
+          >
+            Clear ✕
+          </button>
+        )}
         <select
           value={industry}
           onChange={(e) => setIndustry(e.target.value)}
