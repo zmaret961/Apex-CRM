@@ -95,6 +95,16 @@ export interface Sequence {
   steps: SequenceStep[];
 }
 
+export interface SequenceDue {
+  companyId: number;
+  name: string;
+  status: CompanyStatus;
+  stepIndex: number;
+  day: number;
+  label: string;
+  overdue: number; // days past its scheduled day; 0 = due today
+}
+
 export interface Contact {
   id: number;
   companyId: number;

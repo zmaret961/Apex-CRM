@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { FocusItem, IntelSummary, JobStatus } from "@/lib/types";
+import type { FocusItem, IntelSummary, JobStatus, SequenceDue } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import CompanyDrawer from "./CompanyDrawer";
 import clsx from "clsx";
@@ -11,6 +11,7 @@ interface FocusData {
   intel: IntelSummary;
   pipeline: Record<string, number>;
   digest: { pipelineMoves: number; researchRuns: number; imports: number; notes: number };
+  sequenceDue: SequenceDue[];
 }
 
 const STAGE_ORDER = [
@@ -190,6 +191,25 @@ export default function FocusBoard() {
   const completed = (data?.items ?? []).filter((i) => done.has(i.companyId));
   const snoozedItems = (data?.items ?? []).filter((i) => snoozed.has(i.companyId));
 
+  async function doneTouch(item: SequenceDue) {
+    setBusy(item.companyId);
+    const r = await fetch(`/api/companies/${item.companyId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sequenceStep: { index: item.stepIndex, done: true } }),
+    });
+    setBusy(null);
+    if (!r.ok) return;
+    setData((d) =>
+      d
+        ? {
+            ...d,
+            sequenceDue: d.sequenceDue.filter((s) => s.companyId !== item.companyId),
+          }
+        : d
+    );
+  }
+
   return (
     <div>
       {data && (
@@ -240,6 +260,46 @@ export default function FocusBoard() {
               All caught up — every suggestion handled. New ones appear as research goes stale and
               deals advance.
             </p>
+          </div>
+        )}
+        {(data?.sequenceDue ?? []).length > 0 && (
+          <div className="glass rounded-2xl p-4">
+            <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+              Sequence touches due · {data!.sequenceDue.length}
+            </div>
+            <div className="space-y-1">
+              {data!.sequenceDue.map((s) => (
+                <div
+                  key={`seq-${s.companyId}-${s.stepIndex}`}
+                  className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm"
+                >
+                  <button
+                    onClick={() => setSelected(s.companyId)}
+                    className="min-w-0 flex-1 truncate text-left text-white hover:text-accent-soft"
+                  >
+                    {s.name}
+                    <span className="ml-2 text-xs text-gray-500">
+                      Day {s.day} · {s.label}
+                    </span>
+                  </button>
+                  <span
+                    className={clsx(
+                      "shrink-0 text-[11px]",
+                      s.overdue > 0 ? "font-medium text-amber-300/90" : "text-gray-500"
+                    )}
+                  >
+                    {s.overdue > 0 ? `${s.overdue}d overdue` : "due today"}
+                  </span>
+                  <button
+                    onClick={() => doneTouch(s)}
+                    disabled={busy === s.companyId}
+                    className="interactive shrink-0 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[11px] text-emerald-300 hover:bg-emerald-400/20 disabled:opacity-40"
+                  >
+                    {busy === s.companyId ? "…" : "done"}
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         {pending.map((item) => (

@@ -14,6 +14,8 @@ import type {
   FocusItem,
   IntelSummary,
   Sequence,
+  SequenceDue,
+  SequenceStep,
 } from "./types";
 
 export const VALID_STATUSES: CompanyStatus[] = ["customer", "prospect", "researched", "competitor"];
@@ -270,6 +272,47 @@ export function endSequence(companyId: number) {
   const db = getDb();
   const r = db.prepare("DELETE FROM sequences WHERE companyId = ?").run(companyId);
   if (r.changes > 0) addEvent(companyId, "note", "Outreach sequence ended");
+}
+
+// Next undone touch per active sequence whose scheduled day has arrived —
+// what makes sequences actionable instead of a drawer-only checklist.
+export function sequencesDue(): SequenceDue[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT s.companyId, s.startedAt, s.steps, c.name, c.status
+       FROM sequences s JOIN companies c ON c.id = s.companyId
+       WHERE c.discovered = 0 AND c.status != 'competitor'`
+    )
+    .all() as {
+    companyId: number;
+    startedAt: string;
+    steps: string;
+    name: string;
+    status: CompanyStatus;
+  }[];
+  const now = Date.now();
+  const out: SequenceDue[] = [];
+  for (const r of rows) {
+    const steps = JSON.parse(r.steps) as SequenceStep[];
+    const idx = steps.findIndex((s) => !s.done);
+    if (idx < 0) continue;
+    const step = steps[idx];
+    const elapsed = Math.floor(
+      (now - new Date(r.startedAt.replace(" ", "T") + "Z").getTime()) / 86400000
+    );
+    if (step.day > elapsed) continue;
+    out.push({
+      companyId: r.companyId,
+      name: r.name,
+      status: r.status,
+      stepIndex: idx,
+      day: step.day,
+      label: step.label,
+      overdue: elapsed - step.day,
+    });
+  }
+  return out.sort((a, b) => b.overdue - a.overdue);
 }
 
 export function markResearched(id: number) {
