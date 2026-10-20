@@ -10,6 +10,7 @@ import {
   DISCOVERED_COMPANIES_V3,
   DISCOVERED_COMPANIES_V4,
   SEED_BRIEFS,
+  SEED_EXECS,
   type SeedCompany,
 } from "../data/dataset";
 
@@ -95,11 +96,18 @@ function migrate(db: Database.Database) {
       champion INTEGER NOT NULL DEFAULT 0,
       createdAt TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS execs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      companyId INTEGER NOT NULL REFERENCES companies(id),
+      name TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT ''
+    );
     CREATE INDEX IF NOT EXISTS idx_briefs_company ON research_briefs(companyId);
     CREATE INDEX IF NOT EXISTS idx_claims_brief ON research_claims(briefId);
     CREATE INDEX IF NOT EXISTS idx_log_ts ON activity_log(ts DESC);
     CREATE INDEX IF NOT EXISTS idx_events_company ON company_events(companyId);
     CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(companyId);
+    CREATE INDEX IF NOT EXISTS idx_execs_company ON execs(companyId);
   `);
 }
 
@@ -224,5 +232,20 @@ function applyDataMigrations(db: Database.Database) {
     // enterprises; tracked directly (not queued).
     insertDiscovered(COMPANIES_V5, 0);
     db.pragma("user_version = 6");
+  }
+  if (v < 7) {
+    // Sourced executive org charts for the top of the book.
+    const insertExec = db.prepare(
+      `INSERT INTO execs (companyId, name, role)
+       SELECT c.id, @name, @role FROM companies c
+       WHERE c.domain = @domain
+         AND NOT EXISTS (SELECT 1 FROM execs e WHERE e.companyId = c.id AND e.name = @name)`
+    );
+    for (const entry of SEED_EXECS) {
+      for (const ex of entry.execs) {
+        insertExec.run({ domain: entry.domain, name: ex.name, role: ex.role });
+      }
+    }
+    db.pragma("user_version = 7");
   }
 }

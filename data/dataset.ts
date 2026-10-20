@@ -4954,6 +4954,415 @@ export const DISCOVERED_COMPANIES: SeedCompany[] = [
   ...DISCOVERED_COMPANIES_V4,
 ];
 
+// ── Sourced executive org charts ──────────────────────────────────────────
+// Real, publicly-named executives for the top of the book. Roles are titles as
+// publicly reported; the drawer links each name to a LinkedIn people search so
+// the seller verifies the live profile before outreach. No invented people.
+export interface SeedExec {
+  name: string;
+  role: string;
+}
+
+export const SEED_EXECS: { domain: string; execs: SeedExec[] }[] = [
+  { domain: "goldmansachs.com", execs: [
+    { name: "David Solomon", role: "Chairman & CEO" },
+    { name: "Marco Argenti", role: "Chief Information Officer" },
+    { name: "Asif Haq", role: "Chief Technology Officer" },
+  ]},
+  { domain: "jpmorganchase.com", execs: [
+    { name: "Jamie Dimon", role: "Chairman & CEO" },
+    { name: "Lori Beer", role: "Global Chief Information Officer" },
+  ]},
+  { domain: "citigroup.com", execs: [
+    { name: "Jane Fraser", role: "CEO" },
+    { name: "Jonathan Lofthouse", role: "Head of Markets & Enterprise Risk Technology" },
+  ]},
+  { domain: "morganstanley.com", execs: [
+    { name: "Ted Pick", role: "Chairman & CEO" },
+    { name: "Sal Cucchiara", role: "CIO & Head of Wealth Management Technology" },
+  ]},
+  { domain: "blackrock.com", execs: [
+    { name: "Larry Fink", role: "Chairman & CEO" },
+    { name: "Robert Goldstein", role: "COO & Head of Aladdin" },
+  ]},
+  { domain: "americanexpress.com", execs: [
+    { name: "Stephen Squeri", role: "Chairman & CEO" },
+    { name: "Ravi Radhakrishnan", role: "Chief Information Officer" },
+  ]},
+  { domain: "mastercard.com", execs: [
+    { name: "Michael Miebach", role: "CEO" },
+    { name: "Ed McLaughlin", role: "President & CTO" },
+  ]},
+  { domain: "bloomberg.com", execs: [
+    { name: "Vlad Kliatchko", role: "CEO" },
+    { name: "Shawn Edwards", role: "Chief Technology Officer" },
+  ]},
+  { domain: "bny.com", execs: [
+    { name: "Robin Vince", role: "President & CEO" },
+    { name: "Bridget Engle", role: "Head of Engineering" },
+  ]},
+  { domain: "nasdaq.com", execs: [
+    { name: "Adena Friedman", role: "Chair & CEO" },
+    { name: "Brad Peterson", role: "EVP & Chief Technology/Information Officer" },
+  ]},
+  { domain: "spglobal.com", execs: [
+    { name: "Martina Cheung", role: "President & CEO" },
+  ]},
+  { domain: "moodys.com", execs: [
+    { name: "Rob Fauber", role: "President & CEO" },
+    { name: "Mona Breed", role: "CIO" },
+  ]},
+  { domain: "mlp.com", execs: [
+    { name: "Izzy Englander", role: "Founder & CEO" },
+  ]},
+  { domain: "citadel.com", execs: [
+    { name: "Ken Griffin", role: "Founder & CEO" },
+    { name: "Gerald Beeson", role: "Chief Operating Officer" },
+  ]},
+  { domain: "citadelsecurities.com", execs: [
+    { name: "Peng Zhao", role: "CEO" },
+    { name: "Josh Woodbury", role: "Chief Technology Officer" },
+  ]},
+  { domain: "twosigma.com", execs: [
+    { name: "John Overdeck", role: "Co-founder & Co-chair" },
+    { name: "David Siegel", role: "Co-founder & Co-chair" },
+    { name: "Carter Lyons", role: "Chief Business Officer" },
+  ]},
+  { domain: "deshaw.com", execs: [
+    { name: "Anne Dinning", role: "Executive Committee" },
+    { name: "Max Stone", role: "Executive Committee" },
+  ]},
+  { domain: "hudsonrivertrading.com", execs: [
+    { name: "Jason Carroll", role: "Co-founder" },
+    { name: "Prashant Lal", role: "Co-founder" },
+  ]},
+  { domain: "ramp.com", execs: [
+    { name: "Eric Glyman", role: "Co-founder & CEO" },
+    { name: "Karim Atiyeh", role: "Co-founder & CTO" },
+  ]},
+  { domain: "stripe.com", execs: [
+    { name: "Patrick Collison", role: "Co-founder & CEO" },
+    { name: "David Singleton", role: "Chief Technology Officer" },
+  ]},
+  { domain: "plaid.com", execs: [
+    { name: "Zach Perret", role: "Co-founder & CEO" },
+    { name: "Jean-Denis Greze", role: "Chief Technology Officer" },
+  ]},
+  { domain: "brex.com", execs: [
+    { name: "Pedro Franceschi", role: "Co-founder & CEO" },
+  ]},
+  { domain: "coinbase.com", execs: [
+    { name: "Brian Armstrong", role: "Co-founder & CEO" },
+    { name: "Jesse Pollak", role: "Head of Protocols" },
+  ]},
+  { domain: "chainalysis.com", execs: [
+    { name: "Jonathan Levin", role: "Co-founder & CEO" },
+  ]},
+  { domain: "datadoghq.com", execs: [
+    { name: "Olivier Pomel", role: "Co-founder & CEO" },
+    { name: "Alexis Lê-Quôc", role: "Co-founder & CTO" },
+  ]},
+  { domain: "mongodb.com", execs: [
+    { name: "Dev Ittycheria", role: "President & CEO" },
+    { name: "Eliot Horowitz", role: "Co-founder" },
+  ]},
+  { domain: "digitalocean.com", execs: [
+    { name: "Paddy Srinivasan", role: "CEO" },
+    { name: "Bratin Saha", role: "Chief Product & Technology Officer" },
+  ]},
+  { domain: "cockroachlabs.com", execs: [
+    { name: "Spencer Kimball", role: "Co-founder & CEO" },
+    { name: "Ben Darnell", role: "Co-founder & CTO" },
+  ]},
+  { domain: "wiz.io", execs: [
+    { name: "Assaf Rappaport", role: "Co-founder & CEO" },
+    { name: "Ami Luttwak", role: "Co-founder & CTO" },
+  ]},
+  { domain: "vercel.com", execs: [
+    { name: "Guillermo Rauch", role: "Founder & CEO" },
+    { name: "Malte Ubl", role: "Chief Technology Officer" },
+  ]},
+  { domain: "notion.so", execs: [
+    { name: "Ivan Zhao", role: "Co-founder & CEO" },
+    { name: "Fuzzy Khosrowshahi", role: "Chief Technology Officer" },
+  ]},
+  { domain: "modal.com", execs: [
+    { name: "Erik Bernhardsson", role: "Founder & CEO" },
+    { name: "Akshat Bubna", role: "Co-founder & CTO" },
+  ]},
+  { domain: "runwayml.com", execs: [
+    { name: "Cristóbal Valenzuela", role: "Co-founder & CEO" },
+    { name: "Anastasis Germanidis", role: "Co-founder & CTO" },
+  ]},
+  { domain: "huggingface.co", execs: [
+    { name: "Clem Delangue", role: "Co-founder & CEO" },
+    { name: "Julien Chaumond", role: "Co-founder & CTO" },
+  ]},
+  { domain: "perplexity.ai", execs: [
+    { name: "Aravind Srinivas", role: "Co-founder & CEO" },
+    { name: "Denis Yarats", role: "Co-founder & CTO" },
+  ]},
+  { domain: "alpha-sense.com", execs: [
+    { name: "Jack Kokko", role: "Co-founder & CEO" },
+    { name: "Raj Neervannan", role: "Co-founder & CTO" },
+  ]},
+  { domain: "palantir.com", execs: [
+    { name: "Alex Karp", role: "Co-founder & CEO" },
+    { name: "Shyam Sankar", role: "Chief Technology Officer" },
+  ]},
+  { domain: "databricks.com", execs: [
+    { name: "Ali Ghodsi", role: "Co-founder & CEO" },
+    { name: "Matei Zaharia", role: "Co-founder & CTO" },
+  ]},
+  { domain: "snowflake.com", execs: [
+    { name: "Sridhar Ramaswamy", role: "CEO" },
+    { name: "Benoît Dageville", role: "Co-founder & President of Products" },
+  ]},
+  { domain: "ibm.com", execs: [
+    { name: "Arvind Krishna", role: "Chairman & CEO" },
+    { name: "Rob Thomas", role: "SVP, Software & Chief Commercial Officer" },
+  ]},
+  { domain: "spotify.com", execs: [
+    { name: "Daniel Ek", role: "Co-founder & CEO" },
+    { name: "Gustav Söderström", role: "Co-President, CPO & CTO" },
+  ]},
+  { domain: "uber.com", execs: [
+    { name: "Dara Khosrowshahi", role: "CEO" },
+    { name: "Praveen Neppalli Naga", role: "SVP & CTO" },
+  ]},
+  { domain: "amazon.com", execs: [
+    { name: "Andy Jassy", role: "President & CEO" },
+    { name: "Matt Garman", role: "CEO, AWS" },
+  ]},
+  { domain: "microsoft.com", execs: [
+    { name: "Satya Nadella", role: "Chairman & CEO" },
+    { name: "Scott Guthrie", role: "EVP, Cloud + AI" },
+  ]},
+  { domain: "google.com", execs: [
+    { name: "Sundar Pichai", role: "CEO, Google & Alphabet" },
+    { name: "Thomas Kurian", role: "CEO, Google Cloud" },
+  ]},
+  { domain: "meta.com", execs: [
+    { name: "Mark Zuckerberg", role: "Founder, Chairman & CEO" },
+    { name: "Andrew Bosworth", role: "Chief Technology Officer" },
+  ]},
+  { domain: "openai.com", execs: [
+    { name: "Sam Altman", role: "CEO" },
+    { name: "Brad Lightcap", role: "COO" },
+  ]},
+  { domain: "anthropic.com", execs: [
+    { name: "Dario Amodei", role: "Co-founder & CEO" },
+    { name: "Daniela Amodei", role: "Co-founder & President" },
+  ]},
+  { domain: "cloudflare.com", execs: [
+    { name: "Matthew Prince", role: "Co-founder & CEO" },
+    { name: "John Graham-Cumming", role: "Chief Technology Officer" },
+  ]},
+  { domain: "braze.com", execs: [
+    { name: "Bill Magnuson", role: "Co-founder & CEO" },
+    { name: "Jon Hyman", role: "Co-founder & CTO" },
+  ]},
+  { domain: "eightsleep.com", execs: [
+    { name: "Matteo Franceschetti", role: "Co-founder & CEO" },
+  ]},
+  { domain: "fireblocks.com", execs: [
+    { name: "Michael Shaulov", role: "Co-founder & CEO" },
+    { name: "Idan Ofrat", role: "Co-founder & CTO" },
+  ]},
+  { domain: "litera.com", execs: [
+    { name: "Sheryl Hoskins", role: "CEO" },
+  ]},
+  { domain: "angellist.com", execs: [
+    { name: "Avlok Kohli", role: "CEO" },
+  ]},
+  { domain: "reducto.ai", execs: [
+    { name: "Raunaq Bose", role: "Co-founder & CEO" },
+    { name: "Adit Abraham", role: "Co-founder & CTO" },
+  ]},
+  // Big NYC names from the V5 expansion
+  { domain: "verizon.com", execs: [
+    { name: "Dan Schulman", role: "CEO" },
+    { name: "Sampath Sowmyanarayan", role: "CEO, Verizon Business" },
+  ]},
+  { domain: "pfizer.com", execs: [
+    { name: "Albert Bourla", role: "Chairman & CEO" },
+    { name: "Lidia Fonseca", role: "Chief Digital & Technology Officer" },
+  ]},
+  { domain: "esteeelauder.com", execs: [
+    { name: "Stéphane de La Faverie", role: "President & CEO" },
+    { name: "Michael Smith", role: "Chief Information Officer" },
+  ]},
+  { domain: "warnerbrosdiscovery.com", execs: [
+    { name: "David Zaslav", role: "President & CEO" },
+  ]},
+  { domain: "paramount.com", execs: [
+    { name: "David Ellison", role: "Chairman & CEO" },
+  ]},
+  { domain: "foxcorporation.com", execs: [
+    { name: "Lachlan Murdoch", role: "Executive Chair & CEO" },
+    { name: "Paul Cheesbrough", role: "Chief Technology Officer" },
+  ]},
+  { domain: "nytimes.com", execs: [
+    { name: "Meredith Kopit Levien", role: "President & CEO" },
+    { name: "Jason Sobel", role: "Chief Technology Officer" },
+  ]},
+  { domain: "condenast.com", execs: [
+    { name: "Roger Lynch", role: "CEO" },
+    { name: "Sanjay Bhakta", role: "Chief Product & Technology Officer" },
+  ]},
+  { domain: "hearst.com", execs: [
+    { name: "Steven Swartz", role: "President & CEO" },
+  ]},
+  { domain: "prudential.com", execs: [
+    { name: "Charles Lowrey", role: "Chairman & CEO" },
+    { name: "Robert Bastian", role: "Global CIO" },
+  ]},
+  { domain: "equitable.com", execs: [
+    { name: "Mark Pearson", role: "President & CEO" },
+    { name: "Nick Gartside", role: "CIO" },
+  ]},
+  { domain: "related.com", execs: [
+    { name: "Jeff Blau", role: "CEO" },
+    { name: "Bruce Beal Jr.", role: "President" },
+  ]},
+  { domain: "tishmanspeyer.com", execs: [
+    { name: "Rob Speyer", role: "President & CEO" },
+  ]},
+  { domain: "slgreen.com", execs: [
+    { name: "Marc Holliday", role: "Chairman & CEO" },
+  ]},
+  { domain: "vno.com", execs: [
+    { name: "Steven Roth", role: "Chairman & CEO" },
+    { name: "Michael Franco", role: "President" },
+  ]},
+  { domain: "rxr.com", execs: [
+    { name: "Scott Rechler", role: "Chairman & CEO" },
+  ]},
+  { domain: "penguinrandomhouse.com", execs: [
+    { name: "Nihar Malaviya", role: "Global CEO" },
+  ]},
+  { domain: "harpercollins.com", execs: [
+    { name: "Brian Murray", role: "President & CEO" },
+  ]},
+  { domain: "simonandschuster.com", execs: [
+    { name: "Jonathan Karp", role: "President & CEO" },
+  ]},
+  { domain: "scholastic.com", execs: [
+    { name: "Peter Warwick", role: "President & CEO" },
+    { name: "Dilhani Uduwana", role: "Head of Enterprise Technology" },
+  ]},
+  { domain: "sothebys.com", execs: [
+    { name: "Charles Stewart", role: "CEO" },
+  ]},
+  { domain: "shakeshack.com", execs: [
+    { name: "Rob Lynch", role: "CEO" },
+    { name: "Justin Mennen", role: "EVP & Chief Digital/Information Officer" },
+  ]},
+  { domain: "wonder.com", execs: [
+    { name: "Marc Lore", role: "Founder & CEO" },
+    { name: "James Barclay", role: "CTO" },
+  ]},
+  { domain: "coty.com", execs: [
+    { name: "Sue Nabi", role: "CEO" },
+  ]},
+  { domain: "colgatepalmolive.com", execs: [
+    { name: "Noel Wallace", role: "Chairman, President & CEO" },
+    { name: "Sanjay Ghotbi", role: "CIO" },
+  ]},
+  { domain: "lemonade.com", execs: [
+    { name: "Daniel Schreiber", role: "Co-founder & Co-CEO" },
+    { name: "Shai Wininger", role: "Co-founder & President" },
+  ]},
+  { domain: "companies.cnn.com", execs: [
+    { name: "Mark Thompson", role: "Chairman & CEO" },
+  ]},
+  { domain: "siriusxm.com", execs: [
+    { name: "Jennifer Witz", role: "CEO" },
+    { name: "Joseph Inzerillo", role: "Chief Product & Technology Officer" },
+  ]},
+  { domain: "buzzfeed.com", execs: [
+    { name: "Jonah Peretti", role: "Founder & CEO" },
+  ]},
+  { domain: "iheartmedia.com", execs: [
+    { name: "Bob Pittman", role: "Chairman & CEO" },
+  ]},
+  { domain: "footlocker-inc.com", execs: [
+    { name: "Mary Dillon", role: "CEO" },
+  ]},
+  { domain: "pvh.com", execs: [
+    { name: "Stefan Larsson", role: "CEO" },
+  ]},
+  { domain: "capriholdings.com", execs: [
+    { name: "John Idol", role: "Chairman & CEO" },
+  ]},
+  { domain: "stevemadden.com", execs: [
+    { name: "Edward Rosenfeld", role: "Chairman & CEO" },
+  ]},
+  { domain: "mckinsey.com", execs: [
+    { name: "Bob Sternfels", role: "Global Managing Partner" },
+    { name: "Lareina Yee", role: "Senior Partner, Firm Chair" },
+  ]},
+  { domain: "bcg.com", execs: [
+    { name: "Christoph Schweizer", role: "CEO" },
+    { name: "Sylvain Duranton", role: "Global Leader, BCG X" },
+  ]},
+  { domain: "bain.com", execs: [
+    { name: "Christophe De Vusser", role: "Worldwide Managing Partner" },
+  ]},
+  { domain: "deloitte.com", execs: [
+    { name: "Joe Ucuzoglu", role: "Global CEO" },
+    { name: "Jason Girzadas", role: "CEO, Deloitte US" },
+  ]},
+  { domain: "ey.com", execs: [
+    { name: "Janet Truncale", role: "Global Chair & CEO" },
+    { name: "Julie Boland", role: "US Chair & Managing Partner" },
+  ]},
+  { domain: "pwc.com", execs: [
+    { name: "Paul Griggs", role: "US Senior Partner & CEO" },
+    { name: "Joe Atkinson", role: "Global Chief AI Officer" },
+  ]},
+  { domain: "kpmg.com", execs: [
+    { name: "Paul Knopp", role: "US Chair & CEO" },
+    { name: "Bill Thomas", role: "Global Chairman & CEO" },
+  ]},
+  { domain: "blackstone.com", execs: [
+    { name: "Stephen Schwarzman", role: "Co-founder, Chairman & CEO" },
+    { name: "John Stecher", role: "Chief Technology Officer" },
+  ]},
+  { domain: "kkr.com", execs: [
+    { name: "Joseph Bae", role: "Co-CEO" },
+    { name: "Scott Nuttall", role: "Co-CEO" },
+  ]},
+  { domain: "apollo.com", execs: [
+    { name: "Marc Rowan", role: "CEO" },
+    { name: "Jim Zelter", role: "President" },
+  ]},
+  { domain: "carlyle.com", execs: [
+    { name: "Harvey Schwartz", role: "CEO" },
+  ]},
+  { domain: "ares.com", execs: [
+    { name: "Michael Arougheti", role: "Co-founder, CEO & President" },
+  ]},
+  { domain: "nyp.org", execs: [
+    { name: "Steve Corwin", role: "CEO" },
+    { name: "Peter Fleischut", role: "SVP & Chief Transformation Officer" },
+  ]},
+  { domain: "mountsinai.org", execs: [
+    { name: "Brendan Carr", role: "CEO, Mount Sinai Health System" },
+    { name: "Lisa Stump", role: "SVP & CIO" },
+  ]},
+  { domain: "northwell.edu", execs: [
+    { name: "Michael Dowling", role: "President & CEO" },
+  ]},
+  { domain: "mskcc.org", execs: [
+    { name: "Selwyn Vickers", role: "President & CEO" },
+  ]},
+  { domain: "nyulangone.org", execs: [
+    { name: "Robert Grossman", role: "CEO & Dean" },
+    { name: "Nader Mherabi", role: "Chief Digital & Information Officer" },
+  ]},
+];
+
 export interface SeedBrief {
   company: string;
   createdAt: string;
