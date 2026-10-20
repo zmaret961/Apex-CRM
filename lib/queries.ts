@@ -70,7 +70,9 @@ export function listCompanies(opts: {
     .prepare(
       `SELECT c.*,
          (SELECT MAX(ce.ts) FROM company_events ce
-           WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt
+           WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt,
+         EXISTS(SELECT 1 FROM contacts ct
+           WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion
        FROM companies c WHERE ${where.join(" AND ")} ORDER BY c.fitScore DESC`
     )
     .all(...args) as RawCompany[];
@@ -83,7 +85,9 @@ export function getCompany(id: number): Company | null {
     .prepare(
       `SELECT c.*,
          (SELECT MAX(ce.ts) FROM company_events ce
-           WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt
+           WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt,
+         EXISTS(SELECT 1 FROM contacts ct
+           WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion
        FROM companies c WHERE c.id = ?`
     )
     .get(id) as RawCompany | undefined;

@@ -124,6 +124,10 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     const who = exec ? `${exec.name} (${exec.role})` : `your ${company.industry.toLowerCase()} eng org`;
     const estEng = engCount || Math.max(50, Math.round((company.employees || 500) * 0.2));
     const est = fmtMoney(roiValue(estEng, avgComp, hoursSaved));
+    const rival = intel[0];
+    const diffLine = rival
+      ? `If ${rival.tool} is in the eval too — the honest difference: copilots and editors speed up keystrokes; Devin closes whole tickets end-to-end and opens the PR for review. Different category, not a bake-off.`
+      : null;
     const text = [
       `Subject: ${company.name} — more eng output without more headcount`,
       ``,
@@ -131,6 +135,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
       ``,
       `${hook} — which is why I thought of ${company.name}. ${who} is exactly who we built Devin for: an autonomous software engineer that takes scoped tickets end-to-end (PRs, migrations, test fixes) so senior engineers stay on roadmap work.`,
       ``,
+      ...(diffLine ? [diffLine, ``] : []),
       `Back of the envelope for ~${estEng.toLocaleString()} engineers: roughly ${est} a year in shipped-work capacity back. Happy to walk through the math.`,
       ``,
       `NYC customers like Goldman Sachs run it on real backlog today. Every claim I send cites a source — happy to share the enterprise playbook.`,

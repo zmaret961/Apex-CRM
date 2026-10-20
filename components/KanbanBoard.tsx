@@ -346,23 +346,35 @@ function Card({
         <span className={company.estimatedValue ? "text-emerald-300" : "text-gray-400"}>
           {company.estimatedValue ?? `unconfirmed · fit ${company.fitScore}`}
         </span>
-        <span
-          className={
-            company.stageChangedAt && stageDays(company.stageChangedAt) > 30
-              ? "font-medium text-amber-300/80"
-              : "text-gray-600"
-          }
-          title={
-            company.stageChangedAt && stageDays(company.stageChangedAt) > 30
-              ? "Sitting in this stage over a month — check Focus for next steps"
-              : undefined
-          }
-        >
-          {company.stageChangedAt
-            ? `${daysAgo(company.stageChangedAt)} in stage`
-            : company.lastResearchAt
-            ? `researched ${new Date(company.lastResearchAt).toLocaleDateString()}`
-            : "unresearched"}
+        <span className="flex items-center gap-2">
+          {company.pipelineStage &&
+            !["Closed Won", "Closed Lost"].includes(company.pipelineStage) &&
+            !company.hasChampion && (
+              <span
+                className="text-[10px] font-medium text-amber-300/80"
+                title="No champion contact on this deal — open the profile and star one"
+              >
+                no champion
+              </span>
+            )}
+          <span
+            className={
+              company.stageChangedAt && stageDays(company.stageChangedAt) > 30
+                ? "font-medium text-amber-300/80"
+                : "text-gray-600"
+            }
+            title={
+              company.stageChangedAt && stageDays(company.stageChangedAt) > 30
+                ? "Sitting in this stage over a month — check Focus for next steps"
+                : undefined
+            }
+          >
+            {company.stageChangedAt
+              ? `${daysAgo(company.stageChangedAt)} in stage`
+              : company.lastResearchAt
+              ? `researched ${new Date(company.lastResearchAt).toLocaleDateString()}`
+              : "unresearched"}
+          </span>
         </span>
       </div>
     </div>
