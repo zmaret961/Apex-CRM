@@ -16,6 +16,7 @@ import type {
   Sequence,
   SequenceDue,
   SequenceStep,
+  NoChampionDeal,
 } from "./types";
 
 export const VALID_STATUSES: CompanyStatus[] = ["customer", "prospect", "researched", "competitor"];
@@ -313,6 +314,34 @@ export function sequencesDue(): SequenceDue[] {
     });
   }
   return out.sort((a, b) => b.overdue - a.overdue);
+}
+
+// Open pipeline deals with no starred champion contact — a deal without a
+// named internal advocate is the classic stall, so Focus flags the gap.
+// Furthest-along deals first (a championless Proposal hurts most).
+export function noChampionDeals(limit = 8): NoChampionDeal[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT c.id AS companyId, c.name, c.pipelineStage
+       FROM companies c
+       WHERE c.pipelineStage IS NOT NULL
+         AND c.pipelineStage NOT IN ('Closed Won', 'Closed Lost')
+         AND c.discovered = 0 AND c.status != 'competitor'
+         AND NOT EXISTS (
+           SELECT 1 FROM contacts ct
+           WHERE ct.companyId = c.id AND ct.champion = 1
+         )
+       ORDER BY CASE c.pipelineStage
+                  WHEN 'Proposal' THEN 0
+                  WHEN 'Demo Scheduled' THEN 1
+                  WHEN 'Engaged' THEN 2
+                  ELSE 3
+                END,
+                c.fitScore DESC
+       LIMIT ?`
+    )
+    .all(limit) as NoChampionDeal[];
 }
 
 export function markResearched(id: number) {

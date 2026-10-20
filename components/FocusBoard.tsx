@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { FocusItem, IntelSummary, JobStatus, SequenceDue } from "@/lib/types";
+import type { FocusItem, IntelSummary, JobStatus, NoChampionDeal, SequenceDue } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import CompanyDrawer from "./CompanyDrawer";
 import clsx from "clsx";
@@ -12,6 +12,7 @@ interface FocusData {
   pipeline: Record<string, number>;
   digest: { pipelineMoves: number; researchRuns: number; imports: number; notes: number };
   sequenceDue: SequenceDue[];
+  noChampion: NoChampionDeal[];
 }
 
 const STAGE_ORDER = [
@@ -298,6 +299,35 @@ export default function FocusBoard() {
                   >
                     {busy === s.companyId ? "…" : "done"}
                   </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {(data?.noChampion ?? []).length > 0 && (
+          <div className="glass rounded-2xl p-4">
+            <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+              Deals with no champion · {data!.noChampion.length}
+            </div>
+            <div className="space-y-1">
+              {data!.noChampion.map((d) => (
+                <div
+                  key={`nchamp-${d.companyId}`}
+                  className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm"
+                >
+                  <button
+                    onClick={() => setSelected(d.companyId)}
+                    className="min-w-0 flex-1 truncate text-left text-white hover:text-accent-soft"
+                  >
+                    {d.name}
+                    <span className="ml-2 text-xs text-gray-500">{d.pipelineStage}</span>
+                  </button>
+                  <span
+                    className="shrink-0 text-[11px] text-amber-300/90"
+                    title="Open the account and star a champion — deals stall without an internal advocate"
+                  >
+                    no champion
+                  </span>
                 </div>
               ))}
             </div>

@@ -105,6 +105,12 @@ export interface SequenceDue {
   overdue: number; // days past its scheduled day; 0 = due today
 }
 
+export interface NoChampionDeal {
+  companyId: number;
+  name: string;
+  pipelineStage: PipelineStage;
+}
+
 export interface Contact {
   id: number;
   companyId: number;
