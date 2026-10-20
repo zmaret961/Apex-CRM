@@ -208,6 +208,7 @@ export default function FocusBoard() {
           }
         : d
     );
+    load(); // the next step may also be due — surface it immediately
   }
 
   return (

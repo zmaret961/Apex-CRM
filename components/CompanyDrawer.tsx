@@ -119,12 +119,16 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     const hook =
       company.signals[0]?.text ?? briefs[0]?.whyNow ?? `${company.industry} engineering at scale`;
     const who = exec ? `${exec.name} (${exec.role})` : `your ${company.industry.toLowerCase()} eng org`;
+    const estEng = engCount || Math.max(50, Math.round((company.employees || 500) * 0.2));
+    const est = fmtMoney(roiValue(estEng, avgComp, hoursSaved));
     const text = [
       `Subject: ${company.name} — more eng output without more headcount`,
       ``,
       `Hi ${firstName},`,
       ``,
       `${hook} — which is why I thought of ${company.name}. ${who} is exactly who we built Devin for: an autonomous software engineer that takes scoped tickets end-to-end (PRs, migrations, test fixes) so senior engineers stay on roadmap work.`,
+      ``,
+      `Back of the envelope for ~${estEng.toLocaleString()} engineers: roughly ${est} a year in shipped-work capacity back. Happy to walk through the math.`,
       ``,
       `NYC customers like Goldman Sachs run it on real backlog today. Every claim I send cites a source — happy to share the enterprise playbook.`,
       ``,
@@ -328,6 +332,18 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
           (Date.now() -
             new Date(company.lastResearchAt.replace(" ", "T") + "Z").getTime()) /
             86400000
+        );
+
+  const stageDaysN =
+    company?.pipelineStage == null || company.stageChangedAt == null
+      ? null
+      : Math.max(
+          0,
+          Math.floor(
+            (Date.now() -
+              new Date(company.stageChangedAt.replace(" ", "T") + "Z").getTime()) /
+              86400000
+          )
         );
 
   return (
@@ -591,6 +607,13 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                   </button>
                 )}
               </div>
+              {stageDaysN !== null && (
+                <Row
+                  label="In stage"
+                  value={`${company.pipelineStage} · ${stageDaysN === 0 ? "moved today" : `${stageDaysN}d`}`}
+                  valueClass={stageDaysN > 30 ? "text-amber-300" : undefined}
+                />
+              )}
               <Row
                 label="Last research"
                 value={
