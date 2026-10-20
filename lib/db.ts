@@ -85,10 +85,21 @@ function migrate(db: Database.Database) {
       type TEXT NOT NULL DEFAULT 'note',
       text TEXT NOT NULL DEFAULT ''
     );
+    CREATE TABLE IF NOT EXISTS contacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      companyId INTEGER NOT NULL REFERENCES companies(id),
+      name TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT '',
+      url TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      champion INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
     CREATE INDEX IF NOT EXISTS idx_briefs_company ON research_briefs(companyId);
     CREATE INDEX IF NOT EXISTS idx_claims_brief ON research_claims(briefId);
     CREATE INDEX IF NOT EXISTS idx_log_ts ON activity_log(ts DESC);
     CREATE INDEX IF NOT EXISTS idx_events_company ON company_events(companyId);
+    CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(companyId);
   `);
 }
 

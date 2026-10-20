@@ -2,6 +2,7 @@ import { getDb } from "./db";
 import { PIPELINE_STAGES } from "./types";
 import type {
   Company,
+  Contact,
   SearchHit,
   CompanyEvent,
   CompanyStatus,
@@ -166,6 +167,54 @@ export function eventsFor(companyId: number): CompanyEvent[] {
   return db
     .prepare("SELECT * FROM company_events WHERE companyId = ? ORDER BY id DESC LIMIT 50")
     .all(companyId) as CompanyEvent[];
+}
+
+export function contactsFor(companyId: number): Contact[] {
+  const db = getDb();
+  return db
+    .prepare(
+      "SELECT * FROM contacts WHERE companyId = ? ORDER BY champion DESC, id ASC LIMIT 25"
+    )
+    .all(companyId) as Contact[];
+}
+
+export function addContact(
+  companyId: number,
+  input: { name: string; role?: string; url?: string; notes?: string; champion?: boolean }
+): Contact {
+  const db = getDb();
+  const r = db
+    .prepare(
+      `INSERT INTO contacts (companyId, name, role, url, notes, champion)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      companyId,
+      input.name.trim(),
+      input.role?.trim() ?? "",
+      input.url?.trim() ?? "",
+      input.notes?.trim() ?? "",
+      input.champion ? 1 : 0
+    );
+  addEvent(companyId, "note", `Contact added: ${input.name.trim()}${input.role ? ` (${input.role.trim()})` : ""}`);
+  return db.prepare("SELECT * FROM contacts WHERE id = ?").get(r.lastInsertRowid) as Contact;
+}
+
+export function deleteContact(companyId: number, contactId: number): boolean {
+  const db = getDb();
+  const r = db
+    .prepare("DELETE FROM contacts WHERE id = ? AND companyId = ?")
+    .run(contactId, companyId);
+  return r.changes > 0;
+}
+
+export function setContactChampion(companyId: number, contactId: number, champion: boolean) {
+  const db = getDb();
+  db.prepare("UPDATE contacts SET champion = ? WHERE id = ? AND companyId = ?").run(
+    champion ? 1 : 0,
+    contactId,
+    companyId
+  );
 }
 
 export function markResearched(id: number) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Company, CompanyEvent, FocusItem, PipelineStage, ResearchBrief } from "@/lib/types";
+import type { Company, CompanyEvent, Contact, FocusItem, PipelineStage, ResearchBrief } from "@/lib/types";
 import { PIPELINE_STAGES } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import FitScore from "./FitScore";
@@ -32,6 +32,10 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [company, setCompany] = useState<Company | null>(null);
   const [briefs, setBriefs] = useState<ResearchBrief[]>([]);
   const [events, setEvents] = useState<CompanyEvent[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [contactDraft, setContactDraft] = useState({ name: "", role: "", url: "" });
+  const [savingContact, setSavingContact] = useState(false);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
   const [note, setNote] = useState("");
@@ -61,6 +65,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
         setCompany(d.company);
         setBriefs(d.briefs ?? []);
         setEvents(d.events ?? []);
+        setContacts(d.contacts ?? []);
       });
     fetch("/api/focus")
       .then((r) => r.json())
@@ -91,6 +96,47 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     const d = await fetch(`/api/companies/${company.id}`).then((r) => r.json());
     setCompany(d.company);
     setEvents(d.events ?? []);
+    setContacts(d.contacts ?? []);
+  }
+
+  async function saveContact() {
+    if (!company || !contactDraft.name.trim()) return;
+    setSavingContact(true);
+    await fetch(`/api/companies/${company.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contact: contactDraft }),
+    });
+    const d = await fetch(`/api/companies/${company.id}`).then((r) => r.json());
+    setContacts(d.contacts ?? []);
+    setEvents(d.events ?? []);
+    setContactDraft({ name: "", role: "", url: "" });
+    setShowContactForm(false);
+    setSavingContact(false);
+  }
+
+  async function removeContact(id: number) {
+    if (!company) return;
+    await fetch(`/api/companies/${company.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deleteContact: id }),
+    });
+    setContacts((cs) => cs.filter((c) => c.id !== id));
+  }
+
+  async function toggleChampion(c: Contact) {
+    if (!company) return;
+    setContacts((cs) =>
+      cs
+        .map((x) => (x.id === c.id ? { ...x, champion: c.champion ? 0 : 1 } : x))
+        .sort((a, b) => b.champion - a.champion || a.id - b.id)
+    );
+    await fetch(`/api/companies/${company.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ championContact: c.id, champion: !c.champion }),
+    });
   }
 
   async function addToPipeline() {
@@ -425,6 +471,117 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 </div>
               </section>
             )}
+
+            <section>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Contacts
+                </h3>
+                {!showContactForm && (
+                  <button
+                    onClick={() => setShowContactForm(true)}
+                    className="interactive rounded-lg border border-white/10 px-2 py-0.5 text-xs text-gray-400 hover:text-white"
+                  >
+                    + Contact
+                  </button>
+                )}
+              </div>
+              <div className="glass space-y-2 rounded-xl p-4">
+                {contacts.length === 0 && !showContactForm && (
+                  <p className="text-sm text-gray-600">
+                    No people tracked — add the champion you&apos;re selling through.
+                  </p>
+                )}
+                {contacts.map((c) => (
+                  <div key={c.id} className="group flex items-start gap-2 text-sm">
+                    <button
+                      onClick={() => toggleChampion(c)}
+                      title={c.champion ? "Champion — click to unmark" : "Mark as champion"}
+                      className={`interactive mt-0.5 shrink-0 rounded px-1 ${
+                        c.champion ? "text-amber-300" : "text-gray-600 hover:text-amber-200"
+                      }`}
+                    >
+                      ★
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-200">
+                        {c.name}
+                        {c.champion ? (
+                          <span className="ml-1.5 text-[10px] uppercase tracking-wide text-amber-300/80">
+                            champion
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="text-xs text-gray-500">{c.role || "role unknown"}</p>
+                      {c.url && (
+                        <a
+                          href={c.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-accent-soft hover:underline"
+                        >
+                          profile ↗
+                        </a>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => removeContact(c.id)}
+                      title="Remove contact"
+                      className="interactive shrink-0 rounded px-1.5 py-0.5 text-xs text-gray-600 opacity-0 transition-opacity hover:text-rose-300 group-hover:opacity-100"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {showContactForm && (
+                  <div className="space-y-2 border-t border-white/5 pt-2">
+                    <input
+                      autoFocus
+                      value={contactDraft.name}
+                      onChange={(e) => setContactDraft({ ...contactDraft, name: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveContact();
+                        if (e.key === "Escape") setShowContactForm(false);
+                      }}
+                      maxLength={120}
+                      placeholder="Name — e.g. VP of Engineering"
+                      className="interactive w-full rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-sm outline-none placeholder:text-gray-600 focus:border-accent/50"
+                    />
+                    <input
+                      value={contactDraft.role}
+                      onChange={(e) => setContactDraft({ ...contactDraft, role: e.target.value })}
+                      onKeyDown={(e) => e.key === "Enter" && saveContact()}
+                      maxLength={160}
+                      placeholder="Role / title (optional)"
+                      className="interactive w-full rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-sm outline-none placeholder:text-gray-600 focus:border-accent/50"
+                    />
+                    <input
+                      value={contactDraft.url}
+                      onChange={(e) => setContactDraft({ ...contactDraft, url: e.target.value })}
+                      onKeyDown={(e) => e.key === "Enter" && saveContact()}
+                      maxLength={500}
+                      placeholder="LinkedIn or profile URL (optional)"
+                      className="interactive w-full rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-sm outline-none placeholder:text-gray-600 focus:border-accent/50"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={saveContact}
+                        disabled={!contactDraft.name.trim() || savingContact}
+                        className="interactive rounded-lg border border-accent/40 bg-accent/15 px-3 py-1 text-xs font-medium text-accent-soft disabled:opacity-40"
+                      >
+                        {savingContact ? "Saving…" : "Save contact"}
+                      </button>
+                      <button
+                        onClick={() => setShowContactForm(false)}
+                        className="interactive rounded-lg border border-white/10 px-3 py-1 text-xs text-gray-400"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
 
             <section>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
