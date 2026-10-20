@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  accountIntelFor,
   addContact,
   addEvent,
   briefsFor,
@@ -34,6 +35,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     contacts: contactsFor(company.id),
     execs: execsFor(company.id),
     sequence: sequenceFor(company.id),
+    intel: accountIntelFor(company.id),
   });
 }
 
@@ -145,5 +147,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     company: getCompany(companyId),
     contacts: contactsFor(companyId),
     sequence: sequenceFor(companyId),
+    intel: accountIntelFor(companyId),
   });
 }

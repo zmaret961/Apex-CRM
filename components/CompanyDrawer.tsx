@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Company, CompanyEvent, Contact, Exec, FocusItem, PipelineStage, ResearchBrief, Sequence } from "@/lib/types";
+import type { AccountIntel, Company, CompanyEvent, Contact, Exec, FocusItem, PipelineStage, ResearchBrief, Sequence } from "@/lib/types";
 import { PIPELINE_STAGES } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import FitScore from "./FitScore";
@@ -35,6 +35,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [execs, setExecs] = useState<Exec[]>([]);
   const [sequence, setSequence] = useState<Sequence | null>(null);
+  const [intel, setIntel] = useState<AccountIntel[]>([]);
   const [showContactForm, setShowContactForm] = useState(false);
   const [contactDraft, setContactDraft] = useState({ name: "", role: "", url: "" });
   const [savingContact, setSavingContact] = useState(false);
@@ -76,6 +77,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
         setContacts(d.contacts ?? []);
         setExecs(d.execs ?? []);
         setSequence(d.sequence ?? null);
+        setIntel(d.intel ?? []);
       });
     fetch("/api/focus")
       .then((r) => r.json())
@@ -109,6 +111,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setContacts(d.contacts ?? []);
     setExecs(d.execs ?? []);
     setSequence(d.sequence ?? null);
+    setIntel(d.intel ?? []);
   }
 
   function draftOutreach() {
@@ -502,6 +505,35 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                   <p className="mt-3 text-[10px] text-gray-600">
                     Public leadership — verify before outreach.
                   </p>
+                </div>
+              </section>
+            )}
+
+            {intel.length > 0 && (
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  You&apos;re up against
+                </h3>
+                <div className="space-y-2">
+                  {intel.map((t) => (
+                    <div key={t.tool} className="glass rounded-xl p-3">
+                      <a
+                        href={t.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm font-medium text-rose-300 hover:underline"
+                      >
+                        {t.tool}
+                      </a>
+                      <ul className="mt-1.5 space-y-1">
+                        {t.evidence.map((e, i) => (
+                          <li key={i} className="text-xs leading-relaxed text-gray-500">
+                            {e}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
                 </div>
               </section>
             )}

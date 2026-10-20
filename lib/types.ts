@@ -105,6 +105,12 @@ export interface SequenceDue {
   overdue: number; // days past its scheduled day; 0 = due today
 }
 
+export interface AccountIntel {
+  tool: string;
+  url: string;
+  evidence: string[]; // signal/claim texts where the tool was mentioned
+}
+
 export interface NoChampionDeal {
   companyId: number;
   name: string;

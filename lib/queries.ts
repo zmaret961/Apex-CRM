@@ -17,6 +17,7 @@ import type {
   SequenceDue,
   SequenceStep,
   NoChampionDeal,
+  AccountIntel,
 } from "./types";
 
 export const VALID_STATUSES: CompanyStatus[] = ["customer", "prospect", "researched", "competitor"];
@@ -600,6 +601,44 @@ const KNOWN_TOOLS: { tool: string; url: string; re: RegExp }[] = [
   { tool: "OpenAI Codex", url: "https://openai.com/codex/", re: /codex/gi },
   { tool: "Windsurf", url: "https://windsurf.com", re: /windsurf|codeium/gi },
 ];
+
+// Which rival tools surface in THIS account's signals and research claims —
+// "what am I competing with on this deal?" answered where the seller is.
+export function accountIntelFor(companyId: number): AccountIntel[] {
+  const db = getDb();
+  const texts: string[] = [];
+  const row = db
+    .prepare("SELECT signals FROM companies WHERE id = ?")
+    .get(companyId) as { signals: string } | undefined;
+  try {
+    for (const s of JSON.parse(row?.signals || "[]") as { text: string }[]) {
+      texts.push(s.text);
+    }
+  } catch {
+    /* malformed signals JSON — skip */
+  }
+  for (const r of db
+    .prepare(
+      `SELECT rc.text FROM research_claims rc
+       JOIN research_briefs rb ON rb.id = rc.briefId
+       WHERE rb.companyId = ? AND rc.category IN ('Competitor mention','AI tooling')`
+    )
+    .all(companyId) as { text: string }[]) {
+    texts.push(r.text);
+  }
+
+  const out: AccountIntel[] = [];
+  for (const t of KNOWN_TOOLS) {
+    const evidence = texts.filter((x) => {
+      t.re.lastIndex = 0;
+      return t.re.test(x);
+    });
+    if (evidence.length) {
+      out.push({ tool: t.tool, url: t.url, evidence: evidence.slice(0, 3) });
+    }
+  }
+  return out;
+}
 
 // Aggregates every competitor/AI-tooling mention across briefs and company
 // signals into a per-tool picture of the competitive surface.
