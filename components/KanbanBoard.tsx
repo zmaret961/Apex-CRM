@@ -126,6 +126,32 @@ export default function KanbanBoard() {
     return { openCount: open.length, openValue, weighted, unpriced, wonCount: won.length, wonValue };
   }, [companies]);
 
+  function exportPipelineCsv() {
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = [
+      ["name", "domain", "industry", "status", "pipelineStage", "stageProbability", "estimatedValue", "weightedValue", "hasChampion", "touches"],
+      ...companies.map((c) => {
+        const v = parseMoney(c.estimatedValue);
+        return [
+          c.name, c.domain, c.industry, c.status, c.pipelineStage,
+          STAGE_PROBABILITY[c.pipelineStage ?? "Identified"],
+          c.estimatedValue ?? "",
+          v != null ? Math.round(v * STAGE_PROBABILITY[c.pipelineStage ?? "Identified"]) : "",
+          c.hasChampion ? "yes" : "no",
+          c.sequenceProgress ? `${c.sequenceProgress.done}/${c.sequenceProgress.total}` : "",
+        ];
+      }),
+    ];
+    const blob = new Blob([rows.map((r) => r.map(esc).join(",")).join("\n")], {
+      type: "text/csv",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "apex-pipeline.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
       <div className="glass mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl px-4 py-3 text-sm">
@@ -150,6 +176,13 @@ export default function KanbanBoard() {
             {forecast.unpriced} unpriced — set a value on the card
           </span>
         )}
+        <button
+          onClick={exportPipelineCsv}
+          title="Download the board as CSV (values, odds, weighted, champion + cadence flags)"
+          className="interactive rounded-lg border border-white/10 px-2.5 py-1 text-xs text-gray-400 hover:border-accent/40 hover:text-white"
+        >
+          Export CSV
+        </button>
         <span className="ml-auto text-xs text-gray-600">
           Weighted = stage odds × value · Click a card for full context · drag to move
         </span>
