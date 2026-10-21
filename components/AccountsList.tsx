@@ -140,6 +140,12 @@ export default function AccountsList() {
     return () => clearTimeout(t);
   }, [q, industry, status, stage, sort, refreshKey]);
 
+  // Filters changed → a stale bulk selection pointing at off-list rows is a
+  // footgun; clear it.
+  useEffect(() => {
+    setChecked(new Set());
+  }, [q, industry, status, stage, sort]);
+
   function exportCsv(list: Company[] = companies) {
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const rows = [
@@ -391,7 +397,11 @@ export default function AccountsList() {
           {bulkNote}
         </div>
       )}
-      <CompanyDrawer companyId={selected} onClose={() => setSelected(null)} />
+      <CompanyDrawer
+        companyId={selected}
+        onClose={() => setSelected(null)}
+        onAdded={() => setRefreshKey((k) => k + 1)}
+      />
       {adding && (
         <AddCompanyModal
           industries={INDUSTRIES}

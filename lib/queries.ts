@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { RIVALS } from "./intel";
 import { PIPELINE_STAGES } from "./types";
 import type {
   Company,
@@ -42,9 +43,14 @@ export function listCompanies(opts: {
   const where: string[] = ["c.discovered = ?"];
   const args: unknown[] = [opts.discovered ? 1 : 0];
   if (opts.q) {
-    where.push("(c.name LIKE ? OR c.domain LIKE ? OR c.description LIKE ?)");
-    const q = `%${opts.q}%`;
+    // Escape LIKE metachars so a literal "%" or "_" in the search box
+    // can't wildcard-match the whole book.
+    where.push("(c.name LIKE ? ESCAPE '\\' OR c.domain LIKE ? ESCAPE '\\' OR c.description LIKE ? ESCAPE '\\')");
+    const q = `%${opts.q.replace(/[%_\\]/g, (m) => "\\" + m)}%`;
     args.push(q, q, q);
+  }
+  if (opts.minFit != null && !Number.isFinite(opts.minFit)) {
+    opts.minFit = 0;
   }
   if (opts.industry) {
     where.push("c.industry = ?");
@@ -595,6 +601,9 @@ export function suggestedActions(limit = 12): FocusItem[] {
     )
     .all() as (Omit<FocusItem, "action" | "label" | "reason"> & { stageChangedAt: string | null })[];
   for (const c of stuck) {
+    // Dedupe: a deal already flagged for stale research doesn't need a
+    // second row saying the same thing louder.
+    if (items.some((i) => i.companyId === c.companyId)) continue;
     items.push({
       ...c,
       action: "re-research",
@@ -624,22 +633,15 @@ export function suggestedActions(limit = 12): FocusItem[] {
   return items.slice(0, limit);
 }
 
-const KNOWN_TOOLS: { tool: string; url: string; re: RegExp }[] = [
-  { tool: "GitHub Copilot", url: "https://github.com/features/copilot", re: /copilot/gi },
-  { tool: "Cursor", url: "https://cursor.com", re: /\bcursor\b/gi },
-  { tool: "Claude Code", url: "https://www.anthropic.com/claude-code", re: /claude code|claude\b/gi },
-  { tool: "OpenAI Codex", url: "https://openai.com/codex/", re: /codex/gi },
-  { tool: "Windsurf", url: "https://windsurf.com", re: /windsurf|codeium/gi },
-];
-
-// Which rival tools surface in THIS account's signals and research claims —
-// "what am I competing with on this deal?" answered where the seller is.
+// Which rival tools surface in THIS account's signals, description, and
+// research claims — "what am I competing with on this deal?" answered where
+// the seller is. Registry lives in lib/intel.ts (tiers + talk tracks).
 export function accountIntelFor(companyId: number): AccountIntel[] {
   const db = getDb();
   const texts: string[] = [];
   const row = db
-    .prepare("SELECT signals FROM companies WHERE id = ?")
-    .get(companyId) as { signals: string } | undefined;
+    .prepare("SELECT signals, description FROM companies WHERE id = ?")
+    .get(companyId) as { signals: string; description: string | null } | undefined;
   try {
     for (const s of JSON.parse(row?.signals || "[]") as { text: string }[]) {
       texts.push(s.text);
@@ -647,24 +649,25 @@ export function accountIntelFor(companyId: number): AccountIntel[] {
   } catch {
     /* malformed signals JSON — skip */
   }
+  if (row?.description) texts.push(row.description);
   for (const r of db
     .prepare(
       `SELECT rc.text FROM research_claims rc
        JOIN research_briefs rb ON rb.id = rc.briefId
-       WHERE rb.companyId = ? AND rc.category IN ('Competitor mention','AI tooling')`
+       WHERE rb.companyId = ?`
     )
     .all(companyId) as { text: string }[]) {
     texts.push(r.text);
   }
 
   const out: AccountIntel[] = [];
-  for (const t of KNOWN_TOOLS) {
-    const evidence = texts.filter((x) => {
-      t.re.lastIndex = 0;
-      return t.re.test(x);
-    });
-    if (evidence.length) {
-      out.push({ tool: t.tool, url: t.url, evidence: evidence.slice(0, 3) });
+  for (const t of RIVALS) {
+    const seen = new Set<string>();
+    for (const x of texts) {
+      if (t.re.test(x)) seen.add(x);
+    }
+    if (seen.size) {
+      out.push({ tool: t.tool, url: t.url, tier: t.tier, angle: t.angle, evidence: [...seen].slice(0, 3) });
     }
   }
   return out;
@@ -688,10 +691,10 @@ export function intelSummary(): IntelSummary {
     .all() as { name: string; signals: string }[];
 
   const map = new Map<string, { tool: string; url: string; mentions: number; accounts: Set<string> }>();
-  for (const t of KNOWN_TOOLS) map.set(t.tool, { ...t, mentions: 0, accounts: new Set() });
+  for (const t of RIVALS) map.set(t.tool, { ...t, mentions: 0, accounts: new Set() });
 
   const scan = (text: string, company: string) => {
-    for (const t of KNOWN_TOOLS) {
+    for (const t of RIVALS) {
       if (t.re.test(text)) {
         const e = map.get(t.tool)!;
         e.mentions++;
@@ -711,7 +714,17 @@ export function intelSummary(): IntelSummary {
   }
 
   const tools = [...map.values()]
-    .map((t) => ({ tool: t.tool, url: t.url, mentions: t.mentions, accounts: [...t.accounts].sort() }))
+    .map((t) => {
+      const rival = RIVALS.find((r) => r.tool === t.tool);
+      return {
+        tool: t.tool,
+        url: t.url,
+        tier: (rival?.tier ?? "competitor") as "cognition" | "competitor",
+        angle: rival?.angle ?? "",
+        mentions: t.mentions,
+        accounts: [...t.accounts].sort(),
+      };
+    })
     .sort((a, b) => b.mentions - a.mentions);
 
   return {
@@ -738,10 +751,24 @@ function hydrate(row: RawCompany): Company {
       /* malformed steps JSON — skip */
     }
   }
+  // A malformed sources/signals blob must not crash every query that
+  // hydrates companies — degrade to empty lists instead.
+  let sources: Company["sources"] = [];
+  let signals: Company["signals"] = [];
+  try {
+    sources = JSON.parse(row.sources || "[]");
+  } catch {
+    /* malformed */
+  }
+  try {
+    signals = JSON.parse(row.signals || "[]");
+  } catch {
+    /* malformed */
+  }
   return {
     ...(rest as RawCompany),
-    sources: JSON.parse(row.sources || "[]"),
-    signals: JSON.parse(row.signals || "[]"),
+    sources,
+    signals,
     ...(sequenceProgress ? { sequenceProgress } : {}),
   };
 }

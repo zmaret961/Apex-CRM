@@ -26,6 +26,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!/^\d+$/.test(id)) return NextResponse.json({ error: "invalid id" }, { status: 400 });
   const company = getCompany(Number(id));
   if (!company) return NextResponse.json({ error: "not found" }, { status: 404 });
   return NextResponse.json({
@@ -41,6 +42,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!/^\d+$/.test(id)) return NextResponse.json({ error: "invalid id" }, { status: 400 });
   const companyId = Number(id);
   const current = getCompany(companyId);
   if (!current) return NextResponse.json({ error: "not found" }, { status: 404 });
@@ -53,25 +55,71 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Competitors are intel targets — they can never hold a pipeline stage.
   const effectiveStatus = "status" in body ? body.status : current.status;
 
+  // Validate the whole body BEFORE applying anything — a rejected request
+  // must not partially mutate state or write phantom timeline events.
+  const bad = (error: string) => NextResponse.json({ error }, { status: 400 });
   if ("pipelineStage" in body) {
     if (body.pipelineStage !== null && !isPipelineStage(body.pipelineStage)) {
-      return NextResponse.json(
-        { error: `pipelineStage must be one of the pipeline stages or null` },
-        { status: 400 }
-      );
+      return bad(`pipelineStage must be one of the pipeline stages or null`);
     }
     if (body.pipelineStage !== null && effectiveStatus === "competitor") {
-      return NextResponse.json(
-        { error: "competitors are intel targets — they cannot be added to the pipeline" },
-        { status: 400 }
-      );
+      return bad("competitors are intel targets — they cannot be added to the pipeline");
     }
-    updatePipeline(companyId, body.pipelineStage);
   }
-  if ("status" in body) {
-    if (!isCompanyStatus(body.status)) {
-      return NextResponse.json({ error: "invalid status" }, { status: 400 });
+  if ("status" in body && !isCompanyStatus(body.status)) {
+    return bad("invalid status");
+  }
+  if ("estimatedValue" in body) {
+    const v = body.estimatedValue;
+    if (v !== null && (typeof v !== "string" || v.trim().length === 0 || v.length > 120)) {
+      return bad("estimatedValue must be a string under 120 chars or null");
     }
+  }
+  if ("note" in body) {
+    if (typeof body.note !== "string" || !body.note.trim()) {
+      return bad("note must be a non-empty string");
+    }
+    if (body.note.trim().length > 2000) return bad("note too long");
+  }
+  if ("deleteNote" in body) {
+    const eventId = Number(body.deleteNote);
+    if (!Number.isInteger(eventId) || eventId <= 0) return bad("deleteNote must be an event id");
+  }
+  if ("contact" in body) {
+    const c = body.contact;
+    if (!c || typeof c !== "object" || typeof c.name !== "string" || !c.name.trim()) {
+      return bad("contact.name is required");
+    }
+    if (
+      typeof c.url === "string" &&
+      c.url.trim() &&
+      !/^https?:\/\//i.test(c.url.trim())
+    ) {
+      return bad("contact.url must be an http(s) URL");
+    }
+  }
+  if ("deleteContact" in body) {
+    const contactId = Number(body.deleteContact);
+    if (!Number.isInteger(contactId) || contactId <= 0) return bad("deleteContact must be a contact id");
+  }
+  if ("championContact" in body) {
+    const contactId = Number(body.championContact);
+    if (!Number.isInteger(contactId) || contactId <= 0) {
+      return bad("championContact must be a contact id");
+    }
+    if (!contactsFor(companyId).some((c) => c.id === contactId)) {
+      return NextResponse.json({ error: "championContact contact not found on this company" }, { status: 404 });
+    }
+  }
+  if ("sequenceStep" in body) {
+    const s = body.sequenceStep;
+    const ok = s && typeof s === "object" && Number.isInteger(s.index);
+    if (!ok) return bad("invalid sequenceStep");
+  }
+
+  // All validations passed — apply.
+  if ("pipelineStage" in body) updatePipeline(companyId, body.pipelineStage);
+  if ("status" in body) {
     setStatus(companyId, body.status);
     if (body.status === "competitor" && current.pipelineStage != null) {
       updatePipeline(companyId, null);
@@ -79,33 +127,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if ("estimatedValue" in body) {
     const v = body.estimatedValue;
-    if (v !== null && (typeof v !== "string" || v.trim().length === 0 || v.length > 120)) {
-      return NextResponse.json(
-        { error: "estimatedValue must be a string under 120 chars or null" },
-        { status: 400 }
-      );
-    }
     setEstimatedValue(companyId, v === null ? null : v.trim());
   }
-  if ("note" in body) {
-    const note = String(body.note ?? "").trim();
-    if (!note) return NextResponse.json({ error: "note must be non-empty" }, { status: 400 });
-    if (note.length > 2000)
-      return NextResponse.json({ error: "note too long" }, { status: 400 });
-    addEvent(companyId, "note", note);
-  }
-  if ("deleteNote" in body) {
-    const eventId = Number(body.deleteNote);
-    if (!Number.isInteger(eventId) || eventId <= 0) {
-      return NextResponse.json({ error: "deleteNote must be an event id" }, { status: 400 });
-    }
-    deleteNote(companyId, eventId);
-  }
+  if ("note" in body) addEvent(companyId, "note", body.note.trim());
+  if ("deleteNote" in body) deleteNote(companyId, Number(body.deleteNote));
   if ("contact" in body) {
     const c = body.contact;
-    if (!c || typeof c !== "object" || typeof c.name !== "string" || !c.name.trim()) {
-      return NextResponse.json({ error: "contact.name is required" }, { status: 400 });
-    }
     const clip = (v: unknown, max: number) =>
       typeof v === "string" ? v.trim().slice(0, max) : "";
     addContact(companyId, {
@@ -116,32 +143,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       champion: c.champion === true,
     });
   }
-  if ("deleteContact" in body) {
-    const contactId = Number(body.deleteContact);
-    if (!Number.isInteger(contactId) || contactId <= 0) {
-      return NextResponse.json({ error: "deleteContact must be a contact id" }, { status: 400 });
-    }
-    deleteContact(companyId, contactId);
-  }
+  if ("deleteContact" in body) deleteContact(companyId, Number(body.deleteContact));
   if ("championContact" in body) {
-    const contactId = Number(body.championContact);
-    if (!Number.isInteger(contactId) || contactId <= 0) {
-      return NextResponse.json({ error: "championContact must be a contact id" }, { status: 400 });
-    }
-    setContactChampion(companyId, contactId, body.champion !== false);
+    setContactChampion(companyId, Number(body.championContact), body.champion !== false);
   }
   if (body.startSequence === true) startSequence(companyId);
   if (body.endSequence === true) endSequence(companyId);
   if ("sequenceStep" in body) {
     const s = body.sequenceStep;
-    const ok =
-      s &&
-      typeof s === "object" &&
-      Number.isInteger(s.index) &&
-      setSequenceStep(companyId, s.index, s.done !== false);
-    if (!ok) {
-      return NextResponse.json({ error: "invalid sequenceStep" }, { status: 400 });
-    }
+    const ok = setSequenceStep(companyId, s.index, s.done !== false);
+    if (!ok) return bad("invalid sequenceStep");
   }
   return NextResponse.json({
     company: getCompany(companyId),

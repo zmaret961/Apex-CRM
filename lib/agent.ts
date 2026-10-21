@@ -26,6 +26,9 @@ export function runningJob(): JobStatus | null {
 }
 
 export function startSweep(staleDays = 30): JobStatus {
+  // Defensive: an invalid modifier makes datetime('now', ?) NULL, which
+  // silently narrows the sweep to never-researched accounts only.
+  if (!Number.isFinite(staleDays) || staleDays <= 0) staleDays = 30;
   const db = getDb();
   const rows = db
     .prepare(
@@ -67,7 +70,14 @@ function scheduleNext(job: Job) {
   // Pacing: briefs are synthesized deterministically; the delay simulates
   // fetch/analyze time so the console reads like a real agent loop.
   job.timer = setTimeout(() => {
-    const ok = runResearchOn(next.companyId, job.jobId);
+    // A throwing research run (e.g. one malformed row) must not wedge the
+    // sweep subsystem — mark the item failed and keep the queue moving.
+    let ok = false;
+    try {
+      ok = runResearchOn(next.companyId, job.jobId);
+    } catch (e) {
+      log(job.jobId, "warn", `Research threw for ${next.name}: ${String(e).slice(0, 200)}`);
+    }
     next.state = ok ? "done" : "failed";
     if (ok) job.done++;
     else {

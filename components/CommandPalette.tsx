@@ -18,6 +18,7 @@ const NAV: { id: string; label: string; href: string; key: string }[] = [
   { id: "nav-map", label: "Go to Map", href: "/", key: "m" },
   { id: "nav-focus", label: "Go to Focus", href: "/focus", key: "f" },
   { id: "nav-hot", label: "Go to Hot Leads", href: "/hot-leads", key: "h" },
+  { id: "nav-cards", label: "Go to Battlecards", href: "/battlecards", key: "b" },
   { id: "nav-opps", label: "Go to Opportunities", href: "/opportunities", key: "o" },
   { id: "nav-accounts", label: "Go to Accounts", href: "/accounts", key: "a" },
   { id: "nav-research", label: "Go to Research", href: "/research", key: "r" },
@@ -148,8 +149,11 @@ export default function CommandPalette() {
             c.industry.toLowerCase().includes(needle)
         )
         .slice(0, 7);
+      // A typed query almost always means "find an account" — collect
+      // matches separately and return them ahead of nav/action rows.
+      const matched: Action[] = [];
       for (const c of companyHits) {
-        list.push({
+        matched.push({
           id: `co-${c.id}`,
           kind: "company",
           label: c.name,
@@ -162,7 +166,7 @@ export default function CommandPalette() {
       for (const h of hits) {
         if (shown.has(h.companyId)) continue;
         shown.add(h.companyId);
-        list.push({
+        matched.push({
           id: `re-${h.companyId}`,
           kind: "research",
           label: h.name,
@@ -170,8 +174,9 @@ export default function CommandPalette() {
           kindLabel: "research",
           run: () => router.push(`/?focus=${h.companyId}`),
         });
-        if (list.length > 14) break;
+        if (matched.length > 14) break;
       }
+      return [...matched, ...list];
     }
     return list;
   }, [q, companies, hits, router]);

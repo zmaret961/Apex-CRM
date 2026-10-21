@@ -24,11 +24,24 @@ export async function POST(req: NextRequest) {
     const ok = researchNow(Number(body.companyId));
     return NextResponse.json({ ok }, { status: ok ? 200 : 404 });
   }
+  // Only an explicit/absent sweep request may start a sweep — a malformed or
+  // unknown action must 400, not kick off an expensive job by accident.
+  if (body.action !== undefined && body.action !== null && body.action !== "sweep") {
+    return NextResponse.json({ error: `unknown action "${String(body.action)}"` }, { status: 400 });
+  }
+  if (body.action === "research") {
+    return NextResponse.json({ error: "research action requires companyId" }, { status: 400 });
+  }
+  const staleDays =
+    body.staleDays === undefined ? 30 : Number(body.staleDays);
+  if (!Number.isFinite(staleDays) || staleDays <= 0 || staleDays > 3650) {
+    return NextResponse.json({ error: "staleDays must be a positive number" }, { status: 400 });
+  }
   const running = runningJob();
   if (running) {
     log("crm", "warn", "Sweep request ignored — a research sweep is already running");
     return NextResponse.json({ job: running, alreadyRunning: true });
   }
-  const job = startSweep(body.staleDays ?? 30);
+  const job = startSweep(staleDays);
   return NextResponse.json({ job });
 }

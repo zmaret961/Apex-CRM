@@ -293,10 +293,11 @@ const STAGE_PROBABILITY: Record<PipelineStage, number> = {
 
 function parseMoney(v: string | null): number | null {
   if (!v) return null;
-  const m = v.match(/\$(\d+(?:\.\d+)?)\s*([kKmM])?/);
+  const m = v.match(/\$(\d+(?:\.\d+)?)\s*([kKmMbB])?/);
   if (!m) return null;
   const n = parseFloat(m[1]);
-  return m[2]?.toLowerCase() === "m" ? n * 1_000_000 : m[2]?.toLowerCase() === "k" ? n * 1_000 : n;
+  const u = m[2]?.toLowerCase();
+  return u === "b" ? n * 1_000_000_000 : u === "m" ? n * 1_000_000 : u === "k" ? n * 1_000 : n;
 }
 
 function fmtMoney(v: number): string {

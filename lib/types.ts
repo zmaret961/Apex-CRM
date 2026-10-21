@@ -110,7 +110,9 @@ export interface SequenceDue {
 export interface AccountIntel {
   tool: string;
   url: string;
-  evidence: string[]; // signal/claim texts where the tool was mentioned
+  tier: "cognition" | "competitor"; // Windsurf = Cognition product (warm path)
+  angle: string;                  // talk track for this specific rival
+  evidence: string[];             // deduped signal/claim texts where it was mentioned
 }
 
 export interface NoChampionDeal {
@@ -156,6 +158,8 @@ export interface FocusItem {
 export interface IntelTool {
   tool: string;
   url: string;
+  tier: "cognition" | "competitor"; // Windsurf = Cognition product (warm path)
+  angle: string;                  // talk track for this rival
   mentions: number;
   accounts: string[];
 }

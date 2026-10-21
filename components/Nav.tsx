@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/", label: "Map", icon: "◉" },
   { href: "/focus", label: "Focus", icon: "◎" },
   { href: "/hot-leads", label: "Hot Leads", icon: "🔥" },
+  { href: "/battlecards", label: "Battlecards", icon: "⚔" },
   { href: "/opportunities", label: "Opportunities", icon: "⬡" },
   { href: "/accounts", label: "Accounts", icon: "▦" },
   { href: "/research", label: "Research", icon: "◈" },
@@ -18,7 +19,7 @@ const LINKS = [
 export default function Nav() {
   const path = usePathname();
   return (
-    <header className="fixed inset-x-0 top-0 z-40 flex items-center justify-between px-6 py-3">
+    <header className="fixed inset-x-0 top-0 z-40 flex items-center justify-between px-6 py-3 print:hidden">
       <div className="glass pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/apex-mark.svg" alt="" className="h-7 w-7" />

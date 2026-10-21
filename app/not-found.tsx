@@ -7,8 +7,8 @@ export default function NotFound() {
         <div className="text-4xl">◌</div>
         <h1 className="mt-4 text-lg font-semibold text-white">Page not found</h1>
         <p className="mt-2 text-sm leading-relaxed text-gray-400">
-          Apex only has the Map, Focus, Accounts, Opportunities, Research, and
-          Automation pages — press ⌘K to jump to one.
+          Apex has the Map, Focus, Hot Leads, Accounts, Opportunities, Research,
+          Automation, and Integrations pages — press ⌘K to jump to one.
         </p>
         <div className="mt-6 flex justify-center gap-3">
           <Link

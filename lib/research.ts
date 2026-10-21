@@ -7,14 +7,6 @@ import type { Company } from "./types";
 // When no live web search is available this is the research engine; its
 // outputs are labeled as synthesized-from-seeded-signals in the UI.
 
-const COMPETITOR_POOL = [
-  { name: "GitHub Copilot", url: "https://github.com/features/copilot" },
-  { name: "Cursor", url: "https://cursor.com" },
-  { name: "Claude Code", url: "https://www.anthropic.com/claude-code" },
-  { name: "OpenAI Codex", url: "https://openai.com/codex/" },
-  { name: "Windsurf", url: "https://windsurf.com" },
-];
-
 export function generateBrief(company: Company): {
   whatTheyDo: string;
   whyNow: string;
@@ -41,15 +33,8 @@ export function generateBrief(company: Company): {
     claims.push({ category, text: sig.text, sourceUrl: sig.source });
   }
 
-  // Competitor scan: flag competitive surface for enterprise accounts.
-  if (company.status !== "customer") {
-    const comp = COMPETITOR_POOL[company.name.length % COMPETITOR_POOL.length];
-    claims.push({
-      category: "Competitor mention",
-      text: `Competitive scan: ${comp.name} is the most likely incumbent AI coding tool for an org of this profile. Position Devin on autonomy (multi-hour tasks, PR output) rather than autocomplete.`,
-      sourceUrl: comp.url,
-    });
-  }
+  // No fabricated "likely incumbent" claims — competitive surface only ever
+  // comes from real signal text (see lib/intel.ts registry).
 
   const fundingLine = company.funding && company.funding !== "Private"
     ? ` ${company.funding} suggests budget for engineering-leverage tools.`
