@@ -269,4 +269,81 @@ function applyDataMigrations(db: Database.Database) {
     }
     db.pragma("user_version = 8");
   }
+  if (v < 9) {
+    // Data-quality sweep from the audit: purge dead/absorbed accounts,
+    // correct stale funding/address fields, refresh changed exec roles.
+    const DEAD = [
+      "boweryfarming.com", // shut down 2024
+      "outbrain.com",      // merged into Taboola (already tracked)
+      "innovid.com",       // acquired by Mediaocean (already tracked)
+      "interpublic.com",   // merged into Omnicom (already tracked)
+      "chronosphere.io",   // acquired by Palo Alto Networks (already tracked)
+      "wiz.io",            // acquired by Google (already tracked, competitor)
+      "moneylion.com",     // acquired by Gen Digital
+    ];
+    const marks = DEAD.map(() => "?").join(",");
+    const purge = db.transaction(() => {
+      db.prepare(`DELETE FROM execs WHERE companyId IN (SELECT id FROM companies WHERE domain IN (${marks}))`).run(...DEAD);
+      db.prepare(`DELETE FROM research_claims WHERE briefId IN (SELECT id FROM research_briefs WHERE companyId IN (SELECT id FROM companies WHERE domain IN (${marks})))`).run(...DEAD);
+      db.prepare(`DELETE FROM research_briefs WHERE companyId IN (SELECT id FROM companies WHERE domain IN (${marks}))`).run(...DEAD);
+      db.prepare(`DELETE FROM company_events WHERE companyId IN (SELECT id FROM companies WHERE domain IN (${marks}))`).run(...DEAD);
+      db.prepare(`DELETE FROM contacts WHERE companyId IN (SELECT id FROM companies WHERE domain IN (${marks}))`).run(...DEAD);
+      db.prepare(`DELETE FROM sequences WHERE companyId IN (SELECT id FROM companies WHERE domain IN (${marks}))`).run(...DEAD);
+      db.prepare(`DELETE FROM companies WHERE domain IN (${marks})`).run(...DEAD);
+    });
+    purge();
+
+    const upd = db.prepare(`UPDATE companies SET funding = ? WHERE domain = ?`);
+    const set = (domain: string, _col: string, val: string) =>
+      upd.run(val, domain);
+    set("ramp.com", "funding", "~$22.5B valuation (Jul 2025)");
+    set("openai.com", "funding", "~$500B valuation (Oct 2025)");
+    set("anthropic.com", "funding", "~$183B valuation (Sep 2025)");
+    set("bilt.com", "funding", "~$10.75B valuation (2025)");
+    set("paramount.com", "funding", "Public (NASDAQ: PSKY)");
+    set("codecademy.com", "funding", "Acquired by Skillsoft (2022)");
+    set("complex.com", "funding", "Acquired by NTWRK (2024)");
+    set("squarespace.com", "funding", "Private — Permira take-private ~$7.2B (2024)");
+
+    const hq = (
+      domain: string,
+      address: string,
+      lat: number,
+      lng: number
+    ) => db
+      .prepare(`UPDATE companies SET address = ?, lat = ?, lng = ? WHERE domain = ?`)
+      .run(address, lat, lng, domain);
+    hq("pfizer.com", "66 Hudson Blvd (The Spiral), New York, NY 10001", 40.7537, -74.0013);
+    hq("hsbc.com", "66 Hudson Blvd (The Spiral), New York, NY 10001", 40.7537, -74.0013);
+    hq("ibm.com", "One Madison Ave, New York, NY 10010", 40.7423, -73.9865);
+    hq("sothebys.com", "945 Madison Ave, New York, NY 10021", 40.7738, -73.9642);
+    hq("uipath.com", "One Vanderbilt Ave, New York, NY 10017", 40.7530, -73.9785);
+    hq("unileverusa.com", "111 River St, Hoboken, NJ 07030", 40.7369, -74.0289);
+
+    // Exec role refreshes (all public announcements).
+    db.prepare(
+      `UPDATE execs SET role = 'Co-founder & Executive Chairman'
+       WHERE name = 'Daniel Ek' AND companyId = (SELECT id FROM companies WHERE domain = 'spotify.com')`
+    ).run();
+    db.prepare(
+      `UPDATE execs SET role = 'Co-CEO'
+       WHERE name = 'Gustav Söderström' AND companyId = (SELECT id FROM companies WHERE domain = 'spotify.com')`
+    ).run();
+    db.prepare(
+      `INSERT INTO execs (companyId, name, role)
+       SELECT c.id, 'Alex Norström', 'Co-CEO' FROM companies c
+       WHERE c.domain = 'spotify.com'
+         AND NOT EXISTS (SELECT 1 FROM execs e WHERE e.companyId = c.id AND e.name = 'Alex Norström')`
+    ).run();
+    db.prepare(
+      `UPDATE execs SET name = 'Markus Strobel', role = 'Executive Chairman & Interim CEO'
+       WHERE name = 'Sue Nabi' AND companyId = (SELECT id FROM companies WHERE domain = 'coty.com')`
+    ).run();
+    db.prepare(
+      `UPDATE execs SET role = 'Interim President & CEO'
+       WHERE name = 'Dev Ittycheria' AND companyId = (SELECT id FROM companies WHERE domain = 'mongodb.com')`
+    ).run();
+
+    db.pragma("user_version = 9");
+  }
 }

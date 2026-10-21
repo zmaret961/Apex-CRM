@@ -56,6 +56,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [removedStage, setRemovedStage] = useState<PipelineStage | null>(null);
   const [advancedFrom, setAdvancedFrom] = useState<PipelineStage | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+  const [patchError, setPatchError] = useState<string | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -67,10 +69,19 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setRemovedStage(null);
     setAdvancedFrom(null);
     setSequence(null);
+    setNotFound(false);
+    setPatchError(null);
     if (undoTimer.current) clearTimeout(undoTimer.current);
     fetch(`/api/companies/${companyId}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) {
+          setNotFound(true);
+          return null;
+        }
+        return r.json();
+      })
       .then((d) => {
+        if (!d) return;
         setCompany(d.company);
         setBriefs(d.briefs ?? []);
         setEvents(d.events ?? []);
@@ -100,11 +111,17 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
 
   async function patch(body: Record<string, unknown>) {
     if (!company) return;
-    await fetch(`/api/companies/${company.id}`, {
+    setPatchError(null);
+    const r = await fetch(`/api/companies/${company.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    if (!r.ok) {
+      const err = await r.json().catch(() => null);
+      setPatchError(err?.error ?? `Save failed (${r.status})`);
+      return;
+    }
     const d = await fetch(`/api/companies/${company.id}`).then((r) => r.json());
     setCompany(d.company);
     setEvents(d.events ?? []);
@@ -124,9 +141,15 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     const who = exec ? `${exec.name} (${exec.role})` : `your ${company.industry.toLowerCase()} eng org`;
     const estEng = engCount || Math.max(50, Math.round((company.employees || 500) * 0.2));
     const est = fmtMoney(roiValue(estEng, avgComp, hoursSaved));
-    const rival = intel[0];
+    const rival = intel.find((t) => t.tier === "competitor");
+    const warm = intel.find((t) => t.tier === "cognition");
+    const names = intel.filter((t) => t.tier === "competitor").map((t) => t.tool);
+    const who_else = names.length > 2 ? "other AI coding tools" : names.join(" or ");
     const diffLine = rival
-      ? `If ${rival.tool} is in the eval too — the honest difference: copilots and editors speed up keystrokes; Devin closes whole tickets end-to-end and opens the PR for review. Different category, not a bake-off.`
+      ? `If ${who_else} ${names.length > 1 ? "are" : "is"} in the eval too — the honest difference: ${rival.angle.replace(/\.$/, "")}.`
+      : null;
+    const warmLine = warm
+      ? `P.S. — I saw ${company.name} already runs ${warm.tool}. It's part of Cognition now; happy to connect you with that team and expand from there.`
       : null;
     const text = [
       `Subject: ${company.name} — more eng output without more headcount`,
@@ -143,6 +166,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
       `20 minutes this week?`,
       ``,
       `Zachary`,
+      ...(warmLine ? [``, warmLine] : []),
     ].join("\n");
     setOutreach(text);
   }
@@ -360,14 +384,21 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
         <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
       )}
       <aside
-        className={`glass-deep fixed inset-y-0 right-0 z-50 w-full max-w-md transform overflow-y-auto border-l p-6 transition-transform duration-500 ease-spring ${
+        className={`glass-deep fixed inset-y-0 right-0 z-50 w-full max-w-md transform overflow-y-auto border-l p-6 pt-16 transition-transform duration-500 ease-spring ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
         {!company ? (
-          <div className="flex h-full items-center justify-center text-gray-500">Loading…</div>
+          <div className="flex h-full items-center justify-center text-gray-500">
+            {notFound ? "Account not found." : "Loading…"}
+          </div>
         ) : (
           <div className="animate-fade-up space-y-6">
+            {patchError && (
+              <div className="rounded-xl border border-rose-400/30 bg-rose-400/10 px-3.5 py-2.5 text-xs text-rose-200">
+                {patchError}
+              </div>
+            )}
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-2xl font-semibold tracking-tight text-white">{company.name}</h2>
@@ -525,19 +556,36 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
             {intel.length > 0 && (
               <section>
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  You&apos;re up against
+                  {company.status === "competitor"
+                    ? "Competes with Devin on"
+                    : intel.some((t) => t.tier === "cognition")
+                      ? "Competitive surface + warm path"
+                      : "You\u2019re up against"}
                 </h3>
                 <div className="space-y-2">
                   {intel.map((t) => (
-                    <div key={t.tool} className="glass rounded-xl p-3">
+                    <div
+                      key={t.tool}
+                      className={`glass rounded-xl p-3 ${
+                        t.tier === "cognition" ? "border-emerald-400/25" : ""
+                      }`}
+                    >
                       <a
                         href={t.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-sm font-medium text-rose-300 hover:underline"
+                        className={`text-sm font-medium hover:underline ${
+                          t.tier === "cognition" ? "text-emerald-300" : "text-rose-300"
+                        }`}
                       >
                         {t.tool}
+                        {t.tier === "cognition" && (
+                          <span className="ml-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-normal text-emerald-300">
+                            Cognition
+                          </span>
+                        )}
                       </a>
+                      <p className="mt-1 text-xs leading-relaxed text-gray-400">{t.angle}</p>
                       <ul className="mt-1.5 space-y-1">
                         {t.evidence.map((e, i) => (
                           <li key={i} className="text-xs leading-relaxed text-gray-500">

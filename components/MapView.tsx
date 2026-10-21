@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Map, {
   Source,
   Layer,
@@ -42,6 +42,7 @@ export default function MapView() {
   const [hovered, setHovered] = useState<Company | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const p = new URLSearchParams();
@@ -144,7 +145,7 @@ export default function MapView() {
         ref={setMapRef}
         mapLib={maplibregl}
         mapStyle={BASEMAP}
-        initialViewState={{ longitude: -73.9857, latitude: 40.7280, zoom: 11.6 }}
+        initialViewState={{ longitude: -73.9857, latitude: 40.7420, zoom: 12.4 }}
         maxBounds={[[-76.5, 39.0], [-70.5, 42.5]]}
         interactiveLayerIds={["pins", "pin-glow"]}
         onClick={onClick}
@@ -159,9 +160,9 @@ export default function MapView() {
             type="circle"
             paint={{
               "circle-radius": [
-                "*",
-                ["interpolate", ["linear"], ["zoom"], 10, 7, 13, 12],
-                ["interpolate", ["linear"], ["get", "fitScore"], 60, 0.7, 80, 1, 95, 1.5],
+                "interpolate", ["linear"], ["zoom"],
+                10, ["*", 7, ["interpolate", ["linear"], ["get", "fitScore"], 60, 0.7, 80, 1, 95, 1.5]],
+                13, ["*", 12, ["interpolate", ["linear"], ["get", "fitScore"], 60, 0.7, 80, 1, 95, 1.5]],
               ],
               "circle-color": ["get", "color"],
               "circle-opacity": 0.30,
@@ -174,9 +175,9 @@ export default function MapView() {
             type="circle"
             paint={{
               "circle-radius": [
-                "*",
-                ["interpolate", ["linear"], ["zoom"], 10, 3.5, 13, 6],
-                ["interpolate", ["linear"], ["get", "fitScore"], 60, 0.7, 80, 1, 95, 1.5],
+                "interpolate", ["linear"], ["zoom"],
+                10, ["*", 3.5, ["interpolate", ["linear"], ["get", "fitScore"], 60, 0.7, 80, 1, 95, 1.5]],
+                13, ["*", 6, ["interpolate", ["linear"], ["get", "fitScore"], 60, 0.7, 80, 1, 95, 1.5]],
               ],
               "circle-color": ["get", "color"],
               "circle-stroke-width": 1.25,
@@ -302,7 +303,11 @@ export default function MapView() {
 
       <CompanyDrawer
         companyId={selected}
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          setSelected(null);
+          // Strip ?focus= so the deep link doesn't reopen the drawer on next refetch.
+          if (searchParams.get("focus")) router.replace("/", { scroll: false });
+        }}
         onAdded={() => {
           // Refresh pins so pin state reflects pipeline changes immediately.
           fetch("/api/companies").then((r) => r.json()).then(setCompanies);

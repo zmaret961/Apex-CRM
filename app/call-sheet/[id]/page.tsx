@@ -244,18 +244,19 @@ export default async function CallSheetPage({
                   No rival AI tools detected in this account&rsquo;s signals.
                 </p>
               ) : (
-                <ul className="space-y-1.5">
+                <ul className="space-y-2">
                   {intel.map((t) => (
                     <li key={t.tool} className="text-xs">
-                      <span className="font-semibold text-rose-700">{t.tool}</span>
+                      <span className={`font-semibold ${t.tier === "cognition" ? "text-emerald-700" : "text-rose-700"}`}>
+                        {t.tool}
+                        {t.tier === "cognition" && " (Cognition)"}
+                      </span>
+                      <span className="block text-[11px] italic text-slate-500">{t.angle}</span>
                       {t.evidence[0] && (
-                        <span className="text-slate-600"> — {t.evidence[0]}</span>
+                        <span className="block text-slate-600"> — {t.evidence[0]}</span>
                       )}
                     </li>
                   ))}
-                  <li className="pt-1 text-[11px] italic text-slate-500">
-                    Angle: copilots speed up keystrokes; Devin closes whole tickets end-to-end. Different category.
-                  </li>
                 </ul>
               )}
             </Section>
