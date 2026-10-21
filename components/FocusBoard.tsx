@@ -13,6 +13,7 @@ interface FocusData {
   digest: { pipelineMoves: number; researchRuns: number; imports: number; notes: number };
   sequenceDue: SequenceDue[];
   noChampion: NoChampionDeal[];
+  noSequence: NoChampionDeal[];
 }
 
 const STAGE_ORDER = [
@@ -212,6 +213,21 @@ export default function FocusBoard() {
     load(); // the next step may also be due — surface it immediately
   }
 
+  async function startCadence(companyId: number) {
+    setBusy(companyId);
+    const r = await fetch(`/api/companies/${companyId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ startSequence: true }),
+    });
+    setBusy(null);
+    if (!r.ok) return;
+    setData((d) =>
+      d ? { ...d, noSequence: d.noSequence.filter((x) => x.companyId !== companyId) } : d
+    );
+    load(); // day-0 touch is due immediately — surface it
+  }
+
   return (
     <div>
       {data && (
@@ -328,6 +344,37 @@ export default function FocusBoard() {
                   >
                     no champion
                   </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {(data?.noSequence ?? []).length > 0 && (
+          <div className="glass rounded-2xl p-4">
+            <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+              Deals without a cadence · {data!.noSequence.length}
+            </div>
+            <div className="space-y-1">
+              {data!.noSequence.map((d) => (
+                <div
+                  key={`noseq-${d.companyId}`}
+                  className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm"
+                >
+                  <button
+                    onClick={() => setSelected(d.companyId)}
+                    className="min-w-0 flex-1 truncate text-left text-white hover:text-accent-soft"
+                  >
+                    {d.name}
+                    <span className="ml-2 text-xs text-gray-500">{d.pipelineStage}</span>
+                  </button>
+                  <button
+                    onClick={() => startCadence(d.companyId)}
+                    disabled={busy === d.companyId}
+                    title="Start the 5-touch sequence"
+                    className="interactive shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-2 py-0.5 text-[11px] text-accent-soft hover:bg-accent/20 disabled:opacity-40"
+                  >
+                    {busy === d.companyId ? "…" : "start cadence"}
+                  </button>
                 </div>
               ))}
             </div>

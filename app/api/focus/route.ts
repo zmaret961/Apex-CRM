@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   intelSummary,
   noChampionDeals,
+  noSequenceDeals,
   pipelineCounts,
   sequencesDue,
   suggestedActions,
@@ -18,5 +19,6 @@ export function GET() {
     digest: weeklyDigest(),
     sequenceDue: sequencesDue(),
     noChampion: noChampionDeals(),
+    noSequence: noSequenceDeals(),
   });
 }

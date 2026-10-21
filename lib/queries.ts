@@ -351,6 +351,30 @@ export function noChampionDeals(limit = 8): NoChampionDeal[] {
     .all(limit) as NoChampionDeal[];
 }
 
+// Open deals with no outreach cadence running — parallel to the champion
+// flag: a pipeline deal with zero touches planned quietly goes cold.
+export function noSequenceDeals(limit = 8): NoChampionDeal[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT c.id AS companyId, c.name, c.pipelineStage
+       FROM companies c
+       WHERE c.pipelineStage IS NOT NULL
+         AND c.pipelineStage NOT IN ('Closed Won', 'Closed Lost')
+         AND c.discovered = 0 AND c.status != 'competitor'
+         AND NOT EXISTS (SELECT 1 FROM sequences s WHERE s.companyId = c.id)
+       ORDER BY CASE c.pipelineStage
+                  WHEN 'Proposal' THEN 0
+                  WHEN 'Demo Scheduled' THEN 1
+                  WHEN 'Engaged' THEN 2
+                  ELSE 3
+                END,
+                c.fitScore DESC
+       LIMIT ?`
+    )
+    .all(limit) as NoChampionDeal[];
+}
+
 export function markResearched(id: number) {
   const db = getDb();
   db.prepare(
