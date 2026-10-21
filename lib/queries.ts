@@ -72,7 +72,8 @@ export function listCompanies(opts: {
          (SELECT MAX(ce.ts) FROM company_events ce
            WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt,
          EXISTS(SELECT 1 FROM contacts ct
-           WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion
+           WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion,
+         (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps
        FROM companies c WHERE ${where.join(" AND ")} ORDER BY c.fitScore DESC`
     )
     .all(...args) as RawCompany[];
@@ -87,7 +88,8 @@ export function getCompany(id: number): Company | null {
          (SELECT MAX(ce.ts) FROM company_events ce
            WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt,
          EXISTS(SELECT 1 FROM contacts ct
-           WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion
+           WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion,
+         (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps
        FROM companies c WHERE c.id = ?`
     )
     .get(id) as RawCompany | undefined;
@@ -700,10 +702,23 @@ interface RawCompany extends Omit<Company, "sources" | "signals"> {
 }
 
 function hydrate(row: RawCompany): Company {
+  const { sequenceSteps, ...rest } = row as RawCompany & {
+    sequenceSteps?: string | null;
+  };
+  let sequenceProgress: { done: number; total: number } | undefined;
+  if (sequenceSteps) {
+    try {
+      const steps = JSON.parse(sequenceSteps) as { done: boolean }[];
+      sequenceProgress = { done: steps.filter((s) => s.done).length, total: steps.length };
+    } catch {
+      /* malformed steps JSON — skip */
+    }
+  }
   return {
-    ...row,
+    ...(rest as RawCompany),
     sources: JSON.parse(row.sources || "[]"),
     signals: JSON.parse(row.signals || "[]"),
+    ...(sequenceProgress ? { sequenceProgress } : {}),
   };
 }
 

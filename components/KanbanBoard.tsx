@@ -347,6 +347,14 @@ function Card({
           {company.estimatedValue ?? `unconfirmed · fit ${company.fitScore}`}
         </span>
         <span className="flex items-center gap-2">
+          {company.sequenceProgress && (
+            <span
+              className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent-soft"
+              title="Outreach sequence progress"
+            >
+              {company.sequenceProgress.done}/{company.sequenceProgress.total} touches
+            </span>
+          )}
           {company.pipelineStage &&
             !["Closed Won", "Closed Lost"].includes(company.pipelineStage) &&
             !company.hasChampion && (
