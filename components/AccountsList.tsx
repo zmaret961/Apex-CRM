@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PIPELINE_STAGES, type Company } from "@/lib/types";
-import { heat } from "@/lib/heat";
+import { heat, HOT_THRESHOLD } from "@/lib/heat";
 import StatusPill from "./StatusPill";
 import FitScore from "./FitScore";
 import CompanyDrawer from "./CompanyDrawer";
@@ -327,8 +327,11 @@ export default function AccountsList() {
             />
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="font-medium text-white group-hover:text-accent-soft">
+                <div className="flex items-center gap-1.5 font-medium text-white group-hover:text-accent-soft">
                   {c.name}
+                  {heat(c) >= HOT_THRESHOLD && (
+                    <span className="text-xs" title="Hot account — top heat tier">🔥</span>
+                  )}
                 </div>
                 <div className="mt-0.5 text-xs text-gray-500">
                   {c.industry} · {c.employees > 0 ? `${c.employees.toLocaleString()} employees` : "size unconfirmed"}

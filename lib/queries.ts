@@ -72,7 +72,8 @@ export function listCompanies(opts: {
          (SELECT MAX(ce.ts) FROM company_events ce
            WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt,
          EXISTS(SELECT 1 FROM contacts ct
-           WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion
+           WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion,
+         (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps
        FROM companies c WHERE ${where.join(" AND ")} ORDER BY c.fitScore DESC`
     )
     .all(...args) as RawCompany[];
@@ -87,7 +88,8 @@ export function getCompany(id: number): Company | null {
          (SELECT MAX(ce.ts) FROM company_events ce
            WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt,
          EXISTS(SELECT 1 FROM contacts ct
-           WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion
+           WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion,
+         (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps
        FROM companies c WHERE c.id = ?`
     )
     .get(id) as RawCompany | undefined;
@@ -337,6 +339,30 @@ export function noChampionDeals(limit = 8): NoChampionDeal[] {
            SELECT 1 FROM contacts ct
            WHERE ct.companyId = c.id AND ct.champion = 1
          )
+       ORDER BY CASE c.pipelineStage
+                  WHEN 'Proposal' THEN 0
+                  WHEN 'Demo Scheduled' THEN 1
+                  WHEN 'Engaged' THEN 2
+                  ELSE 3
+                END,
+                c.fitScore DESC
+       LIMIT ?`
+    )
+    .all(limit) as NoChampionDeal[];
+}
+
+// Open deals with no outreach cadence running — parallel to the champion
+// flag: a pipeline deal with zero touches planned quietly goes cold.
+export function noSequenceDeals(limit = 8): NoChampionDeal[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT c.id AS companyId, c.name, c.pipelineStage
+       FROM companies c
+       WHERE c.pipelineStage IS NOT NULL
+         AND c.pipelineStage NOT IN ('Closed Won', 'Closed Lost')
+         AND c.discovered = 0 AND c.status != 'competitor'
+         AND NOT EXISTS (SELECT 1 FROM sequences s WHERE s.companyId = c.id)
        ORDER BY CASE c.pipelineStage
                   WHEN 'Proposal' THEN 0
                   WHEN 'Demo Scheduled' THEN 1
@@ -700,10 +726,23 @@ interface RawCompany extends Omit<Company, "sources" | "signals"> {
 }
 
 function hydrate(row: RawCompany): Company {
+  const { sequenceSteps, ...rest } = row as RawCompany & {
+    sequenceSteps?: string | null;
+  };
+  let sequenceProgress: { done: number; total: number } | undefined;
+  if (sequenceSteps) {
+    try {
+      const steps = JSON.parse(sequenceSteps) as { done: boolean }[];
+      sequenceProgress = { done: steps.filter((s) => s.done).length, total: steps.length };
+    } catch {
+      /* malformed steps JSON — skip */
+    }
+  }
   return {
-    ...row,
+    ...(rest as RawCompany),
     sources: JSON.parse(row.sources || "[]"),
     signals: JSON.parse(row.signals || "[]"),
+    ...(sequenceProgress ? { sequenceProgress } : {}),
   };
 }
 

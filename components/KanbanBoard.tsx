@@ -108,13 +108,7 @@ export default function KanbanBoard() {
       (c) => c.pipelineStage !== "Closed Won" && c.pipelineStage !== "Closed Lost"
     );
     const won = companies.filter((c) => c.pipelineStage === "Closed Won");
-    const parse = (v: string | null): number | null => {
-      if (!v) return null;
-      const m = v.match(/\$(\d+(?:\.\d+)?)\s*([kKmM])?/);
-      if (!m) return null;
-      const n = parseFloat(m[1]);
-      return m[2]?.toLowerCase() === "m" ? n * 1_000_000 : m[2]?.toLowerCase() === "k" ? n * 1_000 : n;
-    };
+    const parse = parseMoney;
     let openValue = 0;
     let weighted = 0;
     let unpriced = 0;
@@ -131,6 +125,32 @@ export default function KanbanBoard() {
     for (const c of won) wonValue += parse(c.estimatedValue) ?? 0;
     return { openCount: open.length, openValue, weighted, unpriced, wonCount: won.length, wonValue };
   }, [companies]);
+
+  function exportPipelineCsv() {
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = [
+      ["name", "domain", "industry", "status", "pipelineStage", "stageProbability", "estimatedValue", "weightedValue", "hasChampion", "touches"],
+      ...companies.map((c) => {
+        const v = parseMoney(c.estimatedValue);
+        return [
+          c.name, c.domain, c.industry, c.status, c.pipelineStage,
+          STAGE_PROBABILITY[c.pipelineStage ?? "Identified"],
+          c.estimatedValue ?? "",
+          v != null ? Math.round(v * STAGE_PROBABILITY[c.pipelineStage ?? "Identified"]) : "",
+          c.hasChampion ? "yes" : "no",
+          c.sequenceProgress ? `${c.sequenceProgress.done}/${c.sequenceProgress.total}` : "",
+        ];
+      }),
+    ];
+    const blob = new Blob([rows.map((r) => r.map(esc).join(",")).join("\n")], {
+      type: "text/csv",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "apex-pipeline.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
 
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
@@ -156,6 +176,13 @@ export default function KanbanBoard() {
             {forecast.unpriced} unpriced — set a value on the card
           </span>
         )}
+        <button
+          onClick={exportPipelineCsv}
+          title="Download the board as CSV (values, odds, weighted, champion + cadence flags)"
+          className="interactive rounded-lg border border-white/10 px-2.5 py-1 text-xs text-gray-400 hover:border-accent/40 hover:text-white"
+        >
+          Export CSV
+        </button>
         <span className="ml-auto text-xs text-gray-600">
           Weighted = stage odds × value · Click a card for full context · drag to move
         </span>
@@ -229,8 +256,15 @@ function Column({
         >
           {stage}
         </h3>
-        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-gray-500">
-          {items.length}
+        <span className="flex items-center gap-1.5">
+          {items.reduce((s, c) => s + (parseMoney(c.estimatedValue) ?? 0), 0) > 0 && (
+            <span className="text-[11px] font-medium text-emerald-300/80">
+              {fmtMoney(items.reduce((s, c) => s + (parseMoney(c.estimatedValue) ?? 0), 0))}
+            </span>
+          )}
+          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-gray-500">
+            {items.length}
+          </span>
         </span>
       </div>
       <div className="space-y-2.5">
@@ -256,6 +290,14 @@ const STAGE_PROBABILITY: Record<PipelineStage, number> = {
   "Closed Won": 1,
   "Closed Lost": 0,
 };
+
+function parseMoney(v: string | null): number | null {
+  if (!v) return null;
+  const m = v.match(/\$(\d+(?:\.\d+)?)\s*([kKmM])?/);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  return m[2]?.toLowerCase() === "m" ? n * 1_000_000 : m[2]?.toLowerCase() === "k" ? n * 1_000 : n;
+}
 
 function fmtMoney(v: number): string {
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
@@ -347,6 +389,14 @@ function Card({
           {company.estimatedValue ?? `unconfirmed · fit ${company.fitScore}`}
         </span>
         <span className="flex items-center gap-2">
+          {company.sequenceProgress && (
+            <span
+              className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent-soft"
+              title="Outreach sequence progress"
+            >
+              {company.sequenceProgress.done}/{company.sequenceProgress.total} touches
+            </span>
+          )}
           {company.pipelineStage &&
             !["Closed Won", "Closed Lost"].includes(company.pipelineStage) &&
             !company.hasChampion && (

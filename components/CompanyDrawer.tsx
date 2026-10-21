@@ -567,24 +567,32 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                     <span>started {new Date(sequence.startedAt.replace(" ", "T") + "Z").toLocaleDateString()}</span>
                   </div>
                   <ol className="space-y-1">
-                    {sequence.steps.map((s, i) => (
-                      <li key={i}>
-                        <label className="interactive flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-white/[0.03]">
-                          <input
-                            type="checkbox"
-                            checked={s.done}
-                            onChange={(e) =>
-                              patch({ sequenceStep: { index: i, done: e.target.checked } })
-                            }
-                            className="shrink-0 accent-accent"
-                          />
-                          <span className="w-10 shrink-0 text-[11px] text-gray-600">Day {s.day}</span>
-                          <span className={s.done ? "text-gray-600 line-through" : "text-gray-300"}>
-                            {s.label}
-                          </span>
-                        </label>
-                      </li>
-                    ))}
+                    {sequence.steps.map((s, i) => {
+                      const due = new Date(
+                        new Date(sequence.startedAt.replace(" ", "T") + "Z").getTime() +
+                          s.day * 86400000
+                      );
+                      return (
+                        <li key={i}>
+                          <label className="interactive flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-white/[0.03]">
+                            <input
+                              type="checkbox"
+                              checked={s.done}
+                              onChange={(e) =>
+                                patch({ sequenceStep: { index: i, done: e.target.checked } })
+                              }
+                              className="shrink-0 accent-accent"
+                            />
+                            <span className="w-16 shrink-0 text-[11px] text-gray-600">
+                              Day {s.day} · {due.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            </span>
+                            <span className={s.done ? "text-gray-600 line-through" : "text-gray-300"}>
+                              {s.label}
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
                   </ol>
                 </div>
               ) : (

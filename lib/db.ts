@@ -253,4 +253,20 @@ function applyDataMigrations(db: Database.Database) {
     }
     db.pragma("user_version = 7");
   }
+  if (v < 8) {
+    // Exec coverage batch 2 — same idempotent domain-keyed insert; safe to
+    // re-run because of the NOT EXISTS guard.
+    const insertExec = db.prepare(
+      `INSERT INTO execs (companyId, name, role)
+       SELECT c.id, @name, @role FROM companies c
+       WHERE c.domain = @domain
+         AND NOT EXISTS (SELECT 1 FROM execs e WHERE e.companyId = c.id AND e.name = @name)`
+    );
+    for (const entry of SEED_EXECS) {
+      for (const ex of entry.execs) {
+        insertExec.run({ domain: entry.domain, name: ex.name, role: ex.role });
+      }
+    }
+    db.pragma("user_version = 8");
+  }
 }
