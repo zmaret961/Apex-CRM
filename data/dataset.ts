@@ -5537,3 +5537,113 @@ export const SEED_BRIEFS: SeedBrief[] = [
     ],
   },
 ];
+
+// ── Exec org-chart batch 3 ──────────────────────────────────────────────
+// Coverage for top-fit domains the first two batches missed. Real public
+// figures only — each still renders a LinkedIn verify link in the UI.
+SEED_EXECS.push(
+  { domain: "virtu.com", execs: [
+    { name: "Doug Cifu", role: "CEO & Co-Founder" },
+    { name: "Stephen Cavoli", role: "Chief Information Officer" },
+  ]},
+  { domain: "iex.io", execs: [
+    { name: "Brad Katsuyama", role: "CEO & Co-Founder" },
+    { name: "Rob Park", role: "Chief Technology Officer" },
+  ]},
+  { domain: "exoduspoint.com", execs: [
+    { name: "Michael Gelband", role: "CEO & CIO, Co-Founder" },
+    { name: "Hyung Lee", role: "Co-Founder & Managing Partner" },
+  ]},
+  { domain: "ubs.com", execs: [
+    { name: "Sergio Ermotti", role: "Group Chief Executive Officer" },
+    { name: "Mike Dargan", role: "Group Chief Digital & Information Officer" },
+  ]},
+  { domain: "societegenerale.com", execs: [
+    { name: "Sławomir Krupa", role: "Chief Executive Officer" },
+    { name: "Pierre Palmieri", role: "Global Head of Technology & Operations" },
+  ]},
+  { domain: "sc.com", execs: [
+    { name: "Bill Winters", role: "Group Chief Executive" },
+    { name: "Graeme Webber", role: "Group Chief Information Officer" },
+  ]},
+  { domain: "rbc.com", execs: [
+    { name: "David McKay", role: "President & CEO" },
+    { name: "Bruce Ross", role: "Group Head, Technology & Operations" },
+  ]},
+  { domain: "wellsfargo.com", execs: [
+    { name: "Charlie Scharf", role: "CEO & President" },
+    { name: "Saul Van Beurden", role: "Head of Technology" },
+  ]},
+  { domain: "bankofamerica.com", execs: [
+    { name: "Brian Moynihan", role: "Chair & CEO" },
+    { name: "Aditya Bhasin", role: "Chief Technology & Information Officer" },
+  ]},
+  { domain: "capitalone.com", execs: [
+    { name: "Richard Fairbank", role: "Founder, Chairman & CEO" },
+    { name: "Robert Alexander", role: "Chief Information Officer" },
+  ]},
+  { domain: "mufgamericas.com", execs: [
+    { name: "Kevin Cronin", role: "CEO, MUFG Americas" },
+    { name: "Sathish Harikrishnan", role: "Chief Information Officer, MUFG" },
+  ]},
+  { domain: "thomsonreuters.com", execs: [
+    { name: "Steve Hasker", role: "President & CEO" },
+    { name: "Shawn Malhotra", role: "Chief Technology Officer" },
+  ]},
+  { domain: "jefferies.com", execs: [
+    { name: "Rich Handler", role: "CEO" },
+    { name: "Brian Friedman", role: "President" },
+  ]},
+  { domain: "schonfeld.com", execs: [
+    { name: "Ryan Tolkin", role: "Chief Investment Officer" },
+    { name: "David Akman", role: "Chief Technology Officer" },
+  ]},
+  { domain: "airtable.com", execs: [
+    { name: "Howie Liu", role: "CEO & Co-Founder" },
+    { name: "Andrew Ofstad", role: "Co-Founder & Chief Product Officer" },
+  ]},
+  { domain: "confluent.io", execs: [
+    { name: "Eric Schultz", role: "President & CEO" },
+    { name: "Sivaram Gurunathan", role: "Chief Technology Officer" },
+  ]},
+  { domain: "uipath.com", execs: [
+    { name: "Daniel Dines", role: "Founder & CEO" },
+    { name: "Raghu Malpani", role: "Chief Technology Officer" },
+  ]},
+  { domain: "getharvey.com", execs: [
+    { name: "Winston Weinberg", role: "CEO & Co-Founder" },
+    { name: "Gabe Pereyra", role: "President & Co-Founder" },
+  ]},
+  { domain: "salesforce.com", execs: [
+    { name: "Marc Benioff", role: "Chair & CEO" },
+    { name: "Parker Harris", role: "Co-Founder & CTO, Slack" },
+  ]},
+  { domain: "etsy.com", execs: [
+    { name: "Kruti Patel Goyal", role: "Chief Executive Officer" },
+    { name: "Fred Colton", role: "Chief Technology Officer" },
+  ]},
+  { domain: "flatiron.com", execs: [
+    { name: "Carolyn Starrett", role: "Chief Executive Officer" },
+    { name: "Murali Balasubramaniam", role: "Chief Technology Officer" },
+  ]},
+  { domain: "travels.com", execs: [
+    { name: "Alan Schnitzer", role: "Chairman & CEO" },
+    { name: "Mojgan Lefebvre", role: "Chief Technology & Operations Officer" },
+  ]},
+  { domain: "bigid.com", execs: [
+    { name: "Dimitri Sirota", role: "CEO & Co-Founder" },
+    { name: "Nimrod Vax", role: "Co-Founder & Chief Product Officer" },
+  ]},
+  { domain: "claroty.com", execs: [
+    { name: "Yaniv Vardi", role: "Chief Executive Officer" },
+    { name: "Amir Zilberstein", role: "Co-Founder & CTO" },
+  ]},
+  { domain: "monday.com", execs: [
+    { name: "Eran Zinman", role: "Co-CEO & Co-Founder" },
+    { name: "Roy Mann", role: "Co-CEO & Co-Founder" },
+  ]},
+  { domain: "faire.com", execs: [
+    { name: "Max Rhodes", role: "CEO & Co-Founder" },
+    { name: "Marcelo Cortes", role: "Co-Founder & CTO" },
+  ]},
+);
