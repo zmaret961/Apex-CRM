@@ -11,6 +11,7 @@ import Map, {
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Company } from "@/lib/types";
+import { heat, HOT_THRESHOLD } from "@/lib/heat";
 import CompanyDrawer from "./CompanyDrawer";
 
 const STATUS_COLOR: Record<string, string> = {
@@ -35,6 +36,7 @@ export default function MapView() {
   const [status, setStatus] = useState<string>("");
   const [minFit, setMinFit] = useState(0);
   const [pipelineOnly, setPipelineOnly] = useState(false);
+  const [hotOnly, setHotOnly] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [mapRef, setMapRef] = useState<MapRef | null>(null);
   const [hovered, setHovered] = useState<Company | null>(null);
@@ -88,10 +90,15 @@ export default function MapView() {
     };
   }, [focusId, companies, mapRef]);
 
+  const shown = useMemo(
+    () => (hotOnly ? companies.filter((c) => heat(c) >= HOT_THRESHOLD) : companies),
+    [companies, hotOnly]
+  );
+
   const geojson = useMemo(
     () => ({
       type: "FeatureCollection" as const,
-      features: companies.map((c) => ({
+      features: shown.map((c) => ({
         type: "Feature" as const,
         geometry: { type: "Point" as const, coordinates: [c.lng, c.lat] },
         properties: {
@@ -103,7 +110,7 @@ export default function MapView() {
         },
       })),
     }),
-    [companies]
+    [shown]
   );
 
   const onClick = useCallback(
@@ -151,7 +158,11 @@ export default function MapView() {
             id="pin-glow"
             type="circle"
             paint={{
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 7, 13, 12],
+              "circle-radius": [
+                "*",
+                ["interpolate", ["linear"], ["zoom"], 10, 7, 13, 12],
+                ["interpolate", ["linear"], ["get", "fitScore"], 60, 0.7, 80, 1, 95, 1.5],
+              ],
               "circle-color": ["get", "color"],
               "circle-opacity": 0.30,
               "circle-blur": 1,
@@ -162,7 +173,11 @@ export default function MapView() {
             id="pins"
             type="circle"
             paint={{
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 3.5, 13, 6],
+              "circle-radius": [
+                "*",
+                ["interpolate", ["linear"], ["zoom"], 10, 3.5, 13, 6],
+                ["interpolate", ["linear"], ["get", "fitScore"], 60, 0.7, 80, 1, 95, 1.5],
+              ],
               "circle-color": ["get", "color"],
               "circle-stroke-width": 1.25,
               "circle-stroke-color": "rgba(255,255,255,0.7)",
@@ -236,6 +251,15 @@ export default function MapView() {
           />
           Pipeline only
         </label>
+        <label className="interactive flex cursor-pointer items-center gap-1.5 rounded-lg border border-orange-400/25 px-2.5 py-1 text-xs text-orange-300" title="Only accounts at or above the Hot tier (fit + signals + momentum)">
+          <input
+            type="checkbox"
+            checked={hotOnly}
+            onChange={(e) => setHotOnly(e.target.checked)}
+            className="accent-orange-400"
+          />
+          🔥 Hot only
+        </label>
         <label className="flex items-center gap-2 text-xs text-gray-400">
           Fit ≥ {minFit}
           <input
@@ -245,12 +269,12 @@ export default function MapView() {
           />
         </label>
         <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs text-gray-400">
-          {companies.length} companies
+          {shown.length} companies
         </span>
       </div>
 
       {/* filtered-to-zero notice */}
-      {loaded && companies.length === 0 && (
+      {loaded && shown.length === 0 && (
         <div className="glass absolute left-1/2 top-40 z-30 -translate-x-1/2 rounded-2xl px-5 py-3 text-sm text-gray-300">
           No companies match these filters —
           <button
@@ -259,6 +283,7 @@ export default function MapView() {
               setStatus("");
               setMinFit(0);
               setPipelineOnly(false);
+              setHotOnly(false);
             }}
             className="ml-1.5 text-accent-soft hover:underline"
           >

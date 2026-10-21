@@ -37,6 +37,7 @@ export interface Company {
   signals: Signal[];
   discovered: number; // 0 = in accounts, 1 = discovered-not-yet-imported
   stageChangedAt?: string | null; // ts of last pipeline move (from company_events)
+  hasChampion?: number; // sqlite EXISTS() → 0/1: a starred contact exists on this account
 }
 
 export interface Claim {
@@ -80,6 +81,41 @@ export interface Exec {
   companyId: number;
   name: string;
   role: string;
+}
+
+export interface SequenceStep {
+  day: number;
+  label: string;
+  done: boolean;
+  doneAt?: string | null;
+}
+
+export interface Sequence {
+  companyId: number;
+  startedAt: string;
+  steps: SequenceStep[];
+}
+
+export interface SequenceDue {
+  companyId: number;
+  name: string;
+  status: CompanyStatus;
+  stepIndex: number;
+  day: number;
+  label: string;
+  overdue: number; // days past its scheduled day; 0 = due today
+}
+
+export interface AccountIntel {
+  tool: string;
+  url: string;
+  evidence: string[]; // signal/claim texts where the tool was mentioned
+}
+
+export interface NoChampionDeal {
+  companyId: number;
+  name: string;
+  pipelineStage: PipelineStage;
 }
 
 export interface Contact {

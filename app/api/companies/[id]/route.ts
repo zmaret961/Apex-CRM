@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  accountIntelFor,
   addContact,
   addEvent,
   briefsFor,
@@ -7,11 +8,15 @@ import {
   deleteContact,
   deleteNote,
   eventsFor,
+  endSequence,
   execsFor,
   getCompany,
   isCompanyStatus,
   isPipelineStage,
+  sequenceFor,
   setContactChampion,
+  setSequenceStep,
+  startSequence,
   updatePipeline,
   setStatus,
   setEstimatedValue,
@@ -29,6 +34,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     events: eventsFor(company.id),
     contacts: contactsFor(company.id),
     execs: execsFor(company.id),
+    sequence: sequenceFor(company.id),
+    intel: accountIntelFor(company.id),
   });
 }
 
@@ -123,5 +130,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     setContactChampion(companyId, contactId, body.champion !== false);
   }
-  return NextResponse.json({ company: getCompany(companyId), contacts: contactsFor(companyId) });
+  if (body.startSequence === true) startSequence(companyId);
+  if (body.endSequence === true) endSequence(companyId);
+  if ("sequenceStep" in body) {
+    const s = body.sequenceStep;
+    const ok =
+      s &&
+      typeof s === "object" &&
+      Number.isInteger(s.index) &&
+      setSequenceStep(companyId, s.index, s.done !== false);
+    if (!ok) {
+      return NextResponse.json({ error: "invalid sequenceStep" }, { status: 400 });
+    }
+  }
+  return NextResponse.json({
+    company: getCompany(companyId),
+    contacts: contactsFor(companyId),
+    sequence: sequenceFor(companyId),
+    intel: accountIntelFor(companyId),
+  });
 }

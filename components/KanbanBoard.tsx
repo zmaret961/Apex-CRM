@@ -103,17 +103,62 @@ export default function KanbanBoard() {
 
   const active = activeId != null ? companies.find((c) => c.id === activeId) : null;
 
+  const forecast = useMemo(() => {
+    const open = companies.filter(
+      (c) => c.pipelineStage !== "Closed Won" && c.pipelineStage !== "Closed Lost"
+    );
+    const won = companies.filter((c) => c.pipelineStage === "Closed Won");
+    const parse = (v: string | null): number | null => {
+      if (!v) return null;
+      const m = v.match(/\$(\d+(?:\.\d+)?)\s*([kKmM])?/);
+      if (!m) return null;
+      const n = parseFloat(m[1]);
+      return m[2]?.toLowerCase() === "m" ? n * 1_000_000 : m[2]?.toLowerCase() === "k" ? n * 1_000 : n;
+    };
+    let openValue = 0;
+    let weighted = 0;
+    let unpriced = 0;
+    for (const c of open) {
+      const v = parse(c.estimatedValue);
+      if (v == null) {
+        unpriced++;
+        continue;
+      }
+      openValue += v;
+      weighted += v * STAGE_PROBABILITY[c.pipelineStage ?? "Identified"];
+    }
+    let wonValue = 0;
+    for (const c of won) wonValue += parse(c.estimatedValue) ?? 0;
+    return { openCount: open.length, openValue, weighted, unpriced, wonCount: won.length, wonValue };
+  }, [companies]);
+
   return (
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-      <div className="mb-4 flex items-center gap-4 text-xs text-gray-500">
-        <span>
-          {companies.filter((c) => c.pipelineStage !== "Closed Won" && c.pipelineStage !== "Closed Lost").length}{" "}
-          open deals
+      <div className="glass mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl px-4 py-3 text-sm">
+        <span className="text-gray-400">
+          {forecast.openCount} open deal{forecast.openCount === 1 ? "" : "s"}
         </span>
-        <span>
-          {companies.filter((c) => c.pipelineStage === "Closed Won").length} won
+        <span className="text-gray-400">
+          Pipeline <span className="font-semibold text-white">{fmtMoney(forecast.openValue)}</span>
         </span>
-        <span className="ml-auto text-gray-600">Click a card for full context · drag to move</span>
+        <span className="text-gray-400">
+          Weighted{" "}
+          <span className="font-semibold text-accent-soft">{fmtMoney(forecast.weighted)}</span>
+        </span>
+        <span className="text-gray-400">
+          Won <span className="font-semibold text-emerald-300">{forecast.wonCount}</span>
+          {forecast.wonValue > 0 && (
+            <span className="text-emerald-300/70"> · {fmtMoney(forecast.wonValue)}</span>
+          )}
+        </span>
+        {forecast.unpriced > 0 && (
+          <span className="text-amber-300/80">
+            {forecast.unpriced} unpriced — set a value on the card
+          </span>
+        )}
+        <span className="ml-auto text-xs text-gray-600">
+          Weighted = stage odds × value · Click a card for full context · drag to move
+        </span>
       </div>
       <div className="flex gap-4 overflow-x-auto pb-4">
         {PIPELINE_STAGES.map((stage) => (
@@ -202,6 +247,22 @@ function Column({
   );
 }
 
+const STAGE_PROBABILITY: Record<PipelineStage, number> = {
+  Identified: 0.1,
+  Researched: 0.2,
+  Engaged: 0.35,
+  "Demo Scheduled": 0.5,
+  Proposal: 0.7,
+  "Closed Won": 1,
+  "Closed Lost": 0,
+};
+
+function fmtMoney(v: number): string {
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `$${Math.round(v / 1_000)}k`;
+  return v > 0 ? `$${Math.round(v)}` : "$0";
+}
+
 function stageDays(ts: string): number {
   return Math.max(0, Math.floor((Date.now() - new Date(ts + "Z").getTime()) / 86400000));
 }
@@ -285,23 +346,35 @@ function Card({
         <span className={company.estimatedValue ? "text-emerald-300" : "text-gray-400"}>
           {company.estimatedValue ?? `unconfirmed · fit ${company.fitScore}`}
         </span>
-        <span
-          className={
-            company.stageChangedAt && stageDays(company.stageChangedAt) > 30
-              ? "font-medium text-amber-300/80"
-              : "text-gray-600"
-          }
-          title={
-            company.stageChangedAt && stageDays(company.stageChangedAt) > 30
-              ? "Sitting in this stage over a month — check Focus for next steps"
-              : undefined
-          }
-        >
-          {company.stageChangedAt
-            ? `${daysAgo(company.stageChangedAt)} in stage`
-            : company.lastResearchAt
-            ? `researched ${new Date(company.lastResearchAt).toLocaleDateString()}`
-            : "unresearched"}
+        <span className="flex items-center gap-2">
+          {company.pipelineStage &&
+            !["Closed Won", "Closed Lost"].includes(company.pipelineStage) &&
+            !company.hasChampion && (
+              <span
+                className="text-[10px] font-medium text-amber-300/80"
+                title="No champion contact on this deal — open the profile and star one"
+              >
+                no champion
+              </span>
+            )}
+          <span
+            className={
+              company.stageChangedAt && stageDays(company.stageChangedAt) > 30
+                ? "font-medium text-amber-300/80"
+                : "text-gray-600"
+            }
+            title={
+              company.stageChangedAt && stageDays(company.stageChangedAt) > 30
+                ? "Sitting in this stage over a month — check Focus for next steps"
+                : undefined
+            }
+          >
+            {company.stageChangedAt
+              ? `${daysAgo(company.stageChangedAt)} in stage`
+              : company.lastResearchAt
+              ? `researched ${new Date(company.lastResearchAt).toLocaleDateString()}`
+              : "unresearched"}
+          </span>
         </span>
       </div>
     </div>

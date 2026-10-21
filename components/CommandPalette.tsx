@@ -276,7 +276,7 @@ export default function CommandPalette() {
         </div>
         <div className="flex items-center justify-between border-t border-white/10 px-4 py-2 text-[11px] text-gray-600">
           <span>⌘K toggle · ↑↓ select · ↵ run · esc close</span>
-          <span>quick nav: m f o a r u</span>
+          <span>quick nav: m f h o a r u i</span>
         </div>
       </div>
     </div>

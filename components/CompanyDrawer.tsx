@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Company, CompanyEvent, Contact, Exec, FocusItem, PipelineStage, ResearchBrief } from "@/lib/types";
+import type { AccountIntel, Company, CompanyEvent, Contact, Exec, FocusItem, PipelineStage, ResearchBrief, Sequence } from "@/lib/types";
 import { PIPELINE_STAGES } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import FitScore from "./FitScore";
@@ -34,6 +34,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [events, setEvents] = useState<CompanyEvent[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [execs, setExecs] = useState<Exec[]>([]);
+  const [sequence, setSequence] = useState<Sequence | null>(null);
+  const [intel, setIntel] = useState<AccountIntel[]>([]);
   const [showContactForm, setShowContactForm] = useState(false);
   const [contactDraft, setContactDraft] = useState({ name: "", role: "", url: "" });
   const [savingContact, setSavingContact] = useState(false);
@@ -64,6 +66,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setAdded(false);
     setRemovedStage(null);
     setAdvancedFrom(null);
+    setSequence(null);
     if (undoTimer.current) clearTimeout(undoTimer.current);
     fetch(`/api/companies/${companyId}`)
       .then((r) => r.json())
@@ -73,6 +76,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
         setEvents(d.events ?? []);
         setContacts(d.contacts ?? []);
         setExecs(d.execs ?? []);
+        setSequence(d.sequence ?? null);
+        setIntel(d.intel ?? []);
       });
     fetch("/api/focus")
       .then((r) => r.json())
@@ -105,6 +110,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setEvents(d.events ?? []);
     setContacts(d.contacts ?? []);
     setExecs(d.execs ?? []);
+    setSequence(d.sequence ?? null);
+    setIntel(d.intel ?? []);
   }
 
   function draftOutreach() {
@@ -115,12 +122,21 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     const hook =
       company.signals[0]?.text ?? briefs[0]?.whyNow ?? `${company.industry} engineering at scale`;
     const who = exec ? `${exec.name} (${exec.role})` : `your ${company.industry.toLowerCase()} eng org`;
+    const estEng = engCount || Math.max(50, Math.round((company.employees || 500) * 0.2));
+    const est = fmtMoney(roiValue(estEng, avgComp, hoursSaved));
+    const rival = intel[0];
+    const diffLine = rival
+      ? `If ${rival.tool} is in the eval too — the honest difference: copilots and editors speed up keystrokes; Devin closes whole tickets end-to-end and opens the PR for review. Different category, not a bake-off.`
+      : null;
     const text = [
       `Subject: ${company.name} — more eng output without more headcount`,
       ``,
       `Hi ${firstName},`,
       ``,
       `${hook} — which is why I thought of ${company.name}. ${who} is exactly who we built Devin for: an autonomous software engineer that takes scoped tickets end-to-end (PRs, migrations, test fixes) so senior engineers stay on roadmap work.`,
+      ``,
+      ...(diffLine ? [diffLine, ``] : []),
+      `Back of the envelope for ~${estEng.toLocaleString()} engineers: roughly ${est} a year in shipped-work capacity back. Happy to walk through the math.`,
       ``,
       `NYC customers like Goldman Sachs run it on real backlog today. Every claim I send cites a source — happy to share the enterprise playbook.`,
       ``,
@@ -326,6 +342,18 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
             86400000
         );
 
+  const stageDaysN =
+    company?.pipelineStage == null || company.stageChangedAt == null
+      ? null
+      : Math.max(
+          0,
+          Math.floor(
+            (Date.now() -
+              new Date(company.stageChangedAt.replace(" ", "T") + "Z").getTime()) /
+              86400000
+          )
+        );
+
   return (
     <>
       {open && (
@@ -486,6 +514,89 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
               </section>
             )}
 
+            {intel.length > 0 && (
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  You&apos;re up against
+                </h3>
+                <div className="space-y-2">
+                  {intel.map((t) => (
+                    <div key={t.tool} className="glass rounded-xl p-3">
+                      <a
+                        href={t.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-sm font-medium text-rose-300 hover:underline"
+                      >
+                        {t.tool}
+                      </a>
+                      <ul className="mt-1.5 space-y-1">
+                        {t.evidence.map((e, i) => (
+                          <li key={i} className="text-xs leading-relaxed text-gray-500">
+                            {e}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Outreach sequence
+                </h3>
+                {sequence && (
+                  <button
+                    onClick={() => patch({ endSequence: true })}
+                    title="End and remove this sequence"
+                    className="interactive rounded px-1.5 py-0.5 text-[11px] text-gray-600 hover:text-gray-300"
+                  >
+                    End
+                  </button>
+                )}
+              </div>
+              {sequence ? (
+                <div className="glass rounded-xl p-3">
+                  <div className="mb-2 flex items-center justify-between px-1 text-[11px] text-gray-500">
+                    <span>
+                      {sequence.steps.filter((s) => s.done).length}/{sequence.steps.length} touches done
+                    </span>
+                    <span>started {new Date(sequence.startedAt.replace(" ", "T") + "Z").toLocaleDateString()}</span>
+                  </div>
+                  <ol className="space-y-1">
+                    {sequence.steps.map((s, i) => (
+                      <li key={i}>
+                        <label className="interactive flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm hover:bg-white/[0.03]">
+                          <input
+                            type="checkbox"
+                            checked={s.done}
+                            onChange={(e) =>
+                              patch({ sequenceStep: { index: i, done: e.target.checked } })
+                            }
+                            className="shrink-0 accent-accent"
+                          />
+                          <span className="w-10 shrink-0 text-[11px] text-gray-600">Day {s.day}</span>
+                          <span className={s.done ? "text-gray-600 line-through" : "text-gray-300"}>
+                            {s.label}
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              ) : (
+                <button
+                  onClick={() => patch({ startSequence: true })}
+                  className="interactive w-full rounded-xl border border-dashed border-white/15 px-3 py-2.5 text-left text-sm text-gray-400 hover:border-accent/40 hover:text-gray-200"
+                >
+                  Start a 5-touch sequence — email → LinkedIn → follow-up → value-add → break-up
+                </button>
+              )}
+            </section>
+
             <div className="glass space-y-2 rounded-xl p-4 text-sm">
               <Row label="HQ / NYC office" value={company.address} />
               <Row
@@ -533,6 +644,13 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                   </button>
                 )}
               </div>
+              {stageDaysN !== null && (
+                <Row
+                  label="In stage"
+                  value={`${company.pipelineStage} · ${stageDaysN === 0 ? "moved today" : `${stageDaysN}d`}`}
+                  valueClass={stageDaysN > 30 ? "text-amber-300" : undefined}
+                />
+              )}
               <Row
                 label="Last research"
                 value={

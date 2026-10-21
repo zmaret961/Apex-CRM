@@ -13,6 +13,11 @@ import type {
   PipelineStage,
   FocusItem,
   IntelSummary,
+  Sequence,
+  SequenceDue,
+  SequenceStep,
+  NoChampionDeal,
+  AccountIntel,
 } from "./types";
 
 export const VALID_STATUSES: CompanyStatus[] = ["customer", "prospect", "researched", "competitor"];
@@ -65,7 +70,9 @@ export function listCompanies(opts: {
     .prepare(
       `SELECT c.*,
          (SELECT MAX(ce.ts) FROM company_events ce
-           WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt
+           WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt,
+         EXISTS(SELECT 1 FROM contacts ct
+           WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion
        FROM companies c WHERE ${where.join(" AND ")} ORDER BY c.fitScore DESC`
     )
     .all(...args) as RawCompany[];
@@ -78,7 +85,9 @@ export function getCompany(id: number): Company | null {
     .prepare(
       `SELECT c.*,
          (SELECT MAX(ce.ts) FROM company_events ce
-           WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt
+           WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt,
+         EXISTS(SELECT 1 FROM contacts ct
+           WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion
        FROM companies c WHERE c.id = ?`
     )
     .get(id) as RawCompany | undefined;
@@ -223,6 +232,121 @@ export function setContactChampion(companyId: number, contactId: number, champio
     contactId,
     companyId
   );
+}
+
+const SEQUENCE_TEMPLATE = [
+  { day: 0, label: "Send personalized email" },
+  { day: 3, label: "LinkedIn touch — connect and reference their signal" },
+  { day: 7, label: "Follow-up — share the research brief" },
+  { day: 12, label: "Value-add — send the ROI estimate" },
+  { day: 21, label: "Break-up email — close the loop" },
+];
+
+export function sequenceFor(companyId: number): Sequence | null {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT * FROM sequences WHERE companyId = ?")
+    .get(companyId) as { companyId: number; startedAt: string; steps: string } | undefined;
+  if (!row) return null;
+  return { companyId: row.companyId, startedAt: row.startedAt, steps: JSON.parse(row.steps) };
+}
+
+export function startSequence(companyId: number) {
+  const db = getDb();
+  const steps = SEQUENCE_TEMPLATE.map((s) => ({ ...s, done: false, doneAt: null }));
+  db.prepare(
+    "INSERT OR REPLACE INTO sequences (companyId, startedAt, steps) VALUES (?, datetime('now'), ?)"
+  ).run(companyId, JSON.stringify(steps));
+  addEvent(companyId, "note", `Outreach sequence started (${SEQUENCE_TEMPLATE.length} touches)`);
+}
+
+export function setSequenceStep(companyId: number, index: number, done: boolean): boolean {
+  const seq = sequenceFor(companyId);
+  if (!seq || index < 0 || index >= seq.steps.length) return false;
+  seq.steps[index].done = done;
+  seq.steps[index].doneAt = done ? new Date().toISOString() : null;
+  const db = getDb();
+  db.prepare("UPDATE sequences SET steps = ? WHERE companyId = ?").run(
+    JSON.stringify(seq.steps),
+    companyId
+  );
+  addEvent(companyId, "note", `Sequence touch ${done ? "done" : "reopened"}: ${seq.steps[index].label}`);
+  return true;
+}
+
+export function endSequence(companyId: number) {
+  const db = getDb();
+  const r = db.prepare("DELETE FROM sequences WHERE companyId = ?").run(companyId);
+  if (r.changes > 0) addEvent(companyId, "note", "Outreach sequence ended");
+}
+
+// Next undone touch per active sequence whose scheduled day has arrived —
+// what makes sequences actionable instead of a drawer-only checklist.
+export function sequencesDue(): SequenceDue[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT s.companyId, s.startedAt, s.steps, c.name, c.status
+       FROM sequences s JOIN companies c ON c.id = s.companyId
+       WHERE c.discovered = 0 AND c.status != 'competitor'`
+    )
+    .all() as {
+    companyId: number;
+    startedAt: string;
+    steps: string;
+    name: string;
+    status: CompanyStatus;
+  }[];
+  const now = Date.now();
+  const out: SequenceDue[] = [];
+  for (const r of rows) {
+    const steps = JSON.parse(r.steps) as SequenceStep[];
+    const idx = steps.findIndex((s) => !s.done);
+    if (idx < 0) continue;
+    const step = steps[idx];
+    const elapsed = Math.floor(
+      (now - new Date(r.startedAt.replace(" ", "T") + "Z").getTime()) / 86400000
+    );
+    if (step.day > elapsed) continue;
+    out.push({
+      companyId: r.companyId,
+      name: r.name,
+      status: r.status,
+      stepIndex: idx,
+      day: step.day,
+      label: step.label,
+      overdue: elapsed - step.day,
+    });
+  }
+  return out.sort((a, b) => b.overdue - a.overdue);
+}
+
+// Open pipeline deals with no starred champion contact — a deal without a
+// named internal advocate is the classic stall, so Focus flags the gap.
+// Furthest-along deals first (a championless Proposal hurts most).
+export function noChampionDeals(limit = 8): NoChampionDeal[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT c.id AS companyId, c.name, c.pipelineStage
+       FROM companies c
+       WHERE c.pipelineStage IS NOT NULL
+         AND c.pipelineStage NOT IN ('Closed Won', 'Closed Lost')
+         AND c.discovered = 0 AND c.status != 'competitor'
+         AND NOT EXISTS (
+           SELECT 1 FROM contacts ct
+           WHERE ct.companyId = c.id AND ct.champion = 1
+         )
+       ORDER BY CASE c.pipelineStage
+                  WHEN 'Proposal' THEN 0
+                  WHEN 'Demo Scheduled' THEN 1
+                  WHEN 'Engaged' THEN 2
+                  ELSE 3
+                END,
+                c.fitScore DESC
+       LIMIT ?`
+    )
+    .all(limit) as NoChampionDeal[];
 }
 
 export function markResearched(id: number) {
@@ -481,6 +605,44 @@ const KNOWN_TOOLS: { tool: string; url: string; re: RegExp }[] = [
   { tool: "OpenAI Codex", url: "https://openai.com/codex/", re: /codex/gi },
   { tool: "Windsurf", url: "https://windsurf.com", re: /windsurf|codeium/gi },
 ];
+
+// Which rival tools surface in THIS account's signals and research claims —
+// "what am I competing with on this deal?" answered where the seller is.
+export function accountIntelFor(companyId: number): AccountIntel[] {
+  const db = getDb();
+  const texts: string[] = [];
+  const row = db
+    .prepare("SELECT signals FROM companies WHERE id = ?")
+    .get(companyId) as { signals: string } | undefined;
+  try {
+    for (const s of JSON.parse(row?.signals || "[]") as { text: string }[]) {
+      texts.push(s.text);
+    }
+  } catch {
+    /* malformed signals JSON — skip */
+  }
+  for (const r of db
+    .prepare(
+      `SELECT rc.text FROM research_claims rc
+       JOIN research_briefs rb ON rb.id = rc.briefId
+       WHERE rb.companyId = ? AND rc.category IN ('Competitor mention','AI tooling')`
+    )
+    .all(companyId) as { text: string }[]) {
+    texts.push(r.text);
+  }
+
+  const out: AccountIntel[] = [];
+  for (const t of KNOWN_TOOLS) {
+    const evidence = texts.filter((x) => {
+      t.re.lastIndex = 0;
+      return t.re.test(x);
+    });
+    if (evidence.length) {
+      out.push({ tool: t.tool, url: t.url, evidence: evidence.slice(0, 3) });
+    }
+  }
+  return out;
+}
 
 // Aggregates every competitor/AI-tooling mention across briefs and company
 // signals into a per-tool picture of the competitive surface.
