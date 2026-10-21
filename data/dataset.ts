@@ -5361,6 +5361,71 @@ export const SEED_EXECS: { domain: string; execs: SeedExec[] }[] = [
     { name: "Robert Grossman", role: "CEO & Dean" },
     { name: "Nader Mherabi", role: "Chief Digital & Information Officer" },
   ]},
+  // Wave 11 coverage batch — global/public execs for high-fit uncovered domains.
+  { domain: "bnpparibas.com", execs: [
+    { name: "Jean-Laurent Bonnafé", role: "Director & CEO, BNP Paribas Group" },
+  ]},
+  { domain: "us.hsbc.com", execs: [
+    { name: "Georges Elhedery", role: "Group CEO, HSBC" },
+    { name: "Michael Roberts", role: "CEO, HSBC USA" },
+  ]},
+  { domain: "grafana.com", execs: [
+    { name: "Raj Dutt", role: "Co-founder & CEO" },
+    { name: "Anthony Woods", role: "Co-founder & CTO" },
+  ]},
+  { domain: "nomura.com", execs: [
+    { name: "Kentaro Okuda", role: "President & Group CEO" },
+  ]},
+  { domain: "block.xyz", execs: [
+    { name: "Jack Dorsey", role: "Chairman & CEO (Block Head)" },
+  ]},
+  { domain: "elastic.co", execs: [
+    { name: "Ash Kulkarni", role: "CEO" },
+    { name: "Shay Banon", role: "Founder & CTO" },
+  ]},
+  { domain: "figma.com", execs: [
+    { name: "Dylan Field", role: "Co-founder & CEO" },
+    { name: "Kris Rasmussen", role: "CTO" },
+  ]},
+  { domain: "squarespace.com", execs: [
+    { name: "Anthony Casalena", role: "Founder & CEO" },
+  ]},
+  { domain: "elevenlabs.io", execs: [
+    { name: "Mati Staniszewski", role: "Co-founder & CEO" },
+    { name: "Piotr Dąbkowski", role: "Co-founder & CTO" },
+  ]},
+  { domain: "hebbia.ai", execs: [
+    { name: "George Sivulka", role: "Founder & CEO" },
+  ]},
+  { domain: "apple.com", execs: [
+    { name: "Tim Cook", role: "CEO" },
+    { name: "Craig Federighi", role: "SVP Software Engineering" },
+  ]},
+  { domain: "nvidia.com", execs: [
+    { name: "Jensen Huang", role: "Founder & CEO" },
+  ]},
+  { domain: "attentive.com", execs: [
+    { name: "Amit Jhawar", role: "CEO" },
+  ]},
+  { domain: "axonius.com", execs: [
+    { name: "Dean Sysman", role: "Co-founder & CEO" },
+  ]},
+  { domain: "servicenow.com", execs: [
+    { name: "Bill McDermott", role: "Chairman & CEO" },
+  ]},
+  { domain: "paloaltonetworks.com", execs: [
+    { name: "Nikesh Arora", role: "Chairman & CEO" },
+    { name: "Nir Zuk", role: "Founder & CTO" },
+  ]},
+  { domain: "wix.com", execs: [
+    { name: "Avishai Abrahami", role: "Co-founder & CEO" },
+  ]},
+  { domain: "macquarie.com", execs: [
+    { name: "Shemara Wikramanayake", role: "Managing Director & CEO" },
+  ]},
+  { domain: "ice.com", execs: [
+    { name: "Jeff Sprecher", role: "Chairman & CEO" },
+  ]},
 ];
 
 export interface SeedBrief {
