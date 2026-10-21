@@ -253,7 +253,14 @@ export default async function CallSheetPage({
                       </span>
                       <span className="block text-[11px] italic text-slate-500">{t.angle}</span>
                       {t.evidence[0] && (
-                        <span className="block text-slate-600"> — {t.evidence[0]}</span>
+                        <span className="block text-slate-600">
+                          — {t.evidence[0].text}
+                          {t.evidence[0].sourceUrl && (
+                            <a href={t.evidence[0].sourceUrl} className="ml-1 text-sky-700 underline">
+                              source
+                            </a>
+                          )}
+                        </span>
                       )}
                     </li>
                   ))}

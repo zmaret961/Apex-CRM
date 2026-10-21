@@ -638,36 +638,36 @@ export function suggestedActions(limit = 12): FocusItem[] {
 // the seller is. Registry lives in lib/intel.ts (tiers + talk tracks).
 export function accountIntelFor(companyId: number): AccountIntel[] {
   const db = getDb();
-  const texts: string[] = [];
+  const texts: { text: string; sourceUrl: string | null }[] = [];
   const row = db
     .prepare("SELECT signals, description FROM companies WHERE id = ?")
     .get(companyId) as { signals: string; description: string | null } | undefined;
   try {
-    for (const s of JSON.parse(row?.signals || "[]") as { text: string }[]) {
-      texts.push(s.text);
+    for (const s of JSON.parse(row?.signals || "[]") as { text: string; url?: string }[]) {
+      texts.push({ text: s.text, sourceUrl: s.url ?? null });
     }
   } catch {
     /* malformed signals JSON — skip */
   }
-  if (row?.description) texts.push(row.description);
+  if (row?.description) texts.push({ text: row.description, sourceUrl: null });
   for (const r of db
     .prepare(
-      `SELECT rc.text FROM research_claims rc
+      `SELECT rc.text, rc.sourceUrl FROM research_claims rc
        JOIN research_briefs rb ON rb.id = rc.briefId
        WHERE rb.companyId = ?`
     )
-    .all(companyId) as { text: string }[]) {
-    texts.push(r.text);
+    .all(companyId) as { text: string; sourceUrl: string | null }[]) {
+    texts.push(r);
   }
 
   const out: AccountIntel[] = [];
   for (const t of RIVALS) {
-    const seen = new Set<string>();
+    const seen = new Map<string, { text: string; sourceUrl: string | null }>();
     for (const x of texts) {
-      if (t.re.test(x)) seen.add(x);
+      if (t.re.test(x.text) && !seen.has(x.text)) seen.set(x.text, x);
     }
     if (seen.size) {
-      out.push({ tool: t.tool, url: t.url, tier: t.tier, angle: t.angle, evidence: [...seen].slice(0, 3) });
+      out.push({ tool: t.tool, url: t.url, tier: t.tier, angle: t.angle, evidence: [...seen.values()].slice(0, 3) });
     }
   }
   return out;

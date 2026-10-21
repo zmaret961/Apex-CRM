@@ -589,7 +589,17 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                       <ul className="mt-1.5 space-y-1">
                         {t.evidence.map((e, i) => (
                           <li key={i} className="text-xs leading-relaxed text-gray-500">
-                            {e}
+                            {e.text}
+                            {e.sourceUrl && (
+                              <a
+                                href={e.sourceUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="ml-1.5 text-sky-400/70 hover:text-sky-300"
+                              >
+                                source ↗
+                              </a>
+                            )}
                           </li>
                         ))}
                       </ul>

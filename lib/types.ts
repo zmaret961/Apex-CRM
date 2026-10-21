@@ -112,7 +112,7 @@ export interface AccountIntel {
   url: string;
   tier: "cognition" | "competitor"; // Windsurf = Cognition product (warm path)
   angle: string;                  // talk track for this specific rival
-  evidence: string[];             // deduped signal/claim texts where it was mentioned
+  evidence: { text: string; sourceUrl: string | null }[]; // deduped signal/claim texts + their source
 }
 
 export interface NoChampionDeal {
