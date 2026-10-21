@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PIPELINE_STAGES, type Company } from "@/lib/types";
+import { heat } from "@/lib/heat";
 import StatusPill from "./StatusPill";
 import FitScore from "./FitScore";
 import CompanyDrawer from "./CompanyDrawer";
@@ -15,8 +16,8 @@ const INDUSTRIES = [
 
 const FILTERS_KEY = "apex-accounts-filters";
 
-function loadFilters(): { q: string; industry: string; status: string; stage: string; sort: "fit" | "name" | "employees" } {
-  const empty = { q: "", industry: "", status: "", stage: "", sort: "fit" as const };
+function loadFilters(): { q: string; industry: string; status: string; stage: string; sort: "heat" | "fit" | "name" | "employees" } {
+  const empty = { q: "", industry: "", status: "", stage: "", sort: "heat" as const };
   try {
     const raw = JSON.parse(localStorage.getItem(FILTERS_KEY) ?? "null");
     if (!raw || typeof raw !== "object") return empty;
@@ -25,7 +26,7 @@ function loadFilters(): { q: string; industry: string; status: string; stage: st
       industry: typeof raw.industry === "string" ? raw.industry : "",
       status: typeof raw.status === "string" ? raw.status : "",
       stage: typeof raw.stage === "string" ? raw.stage : "",
-      sort: ["fit", "name", "employees"].includes(raw.sort) ? raw.sort : "fit",
+      sort: ["heat", "fit", "name", "employees"].includes(raw.sort) ? raw.sort : "heat",
     };
   } catch {
     return empty;
@@ -39,7 +40,7 @@ export default function AccountsList() {
   const [industry, setIndustry] = useState("");
   const [status, setStatus] = useState("");
   const [stage, setStage] = useState("");
-  const [sort, setSort] = useState<"fit" | "name" | "employees">("fit");
+  const [sort, setSort] = useState<"heat" | "fit" | "name" | "employees">("heat");
   const [selected, setSelected] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -130,6 +131,8 @@ export default function AccountsList() {
         .then((list: Company[]) => {
           if (sort === "name") list.sort((a, b) => a.name.localeCompare(b.name));
           else if (sort === "employees") list.sort((a, b) => b.employees - a.employees);
+          else if (sort === "heat") list.sort((a, b) => heat(b) - heat(a));
+          else if (sort === "fit") list.sort((a, b) => b.fitScore - a.fitScore);
           setCompanies(list);
           setLoaded(true);
         });
@@ -258,6 +261,7 @@ export default function AccountsList() {
           className="interactive rounded-lg border border-white/10 bg-transparent px-2 py-1.5 text-sm text-gray-300 [&>option]:bg-base-900"
           aria-label="Sort"
         >
+          <option value="heat">Sort: heat</option>
           <option value="fit">Sort: fit score</option>
           <option value="name">Sort: name</option>
           <option value="employees">Sort: size</option>

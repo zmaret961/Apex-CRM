@@ -158,7 +158,11 @@ export default function MapView() {
             id="pin-glow"
             type="circle"
             paint={{
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 7, 13, 12],
+              "circle-radius": [
+                "*",
+                ["interpolate", ["linear"], ["zoom"], 10, 7, 13, 12],
+                ["interpolate", ["linear"], ["get", "fitScore"], 60, 0.7, 80, 1, 95, 1.5],
+              ],
               "circle-color": ["get", "color"],
               "circle-opacity": 0.30,
               "circle-blur": 1,
@@ -169,7 +173,11 @@ export default function MapView() {
             id="pins"
             type="circle"
             paint={{
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 3.5, 13, 6],
+              "circle-radius": [
+                "*",
+                ["interpolate", ["linear"], ["zoom"], 10, 3.5, 13, 6],
+                ["interpolate", ["linear"], ["get", "fitScore"], 60, 0.7, 80, 1, 95, 1.5],
+              ],
               "circle-color": ["get", "color"],
               "circle-stroke-width": 1.25,
               "circle-stroke-color": "rgba(255,255,255,0.7)",
