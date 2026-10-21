@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { HOT_THRESHOLD } from "./heat";
 import { RIVALS } from "./intel";
 import { PIPELINE_STAGES } from "./types";
 import type {
@@ -18,6 +19,7 @@ import type {
   SequenceDue,
   SequenceStep,
   NoChampionDeal,
+  NeverEngagedAccount,
   AccountIntel,
 } from "./types";
 
@@ -379,6 +381,47 @@ export function noSequenceDeals(limit = 8): NoChampionDeal[] {
        LIMIT ?`
     )
     .all(limit) as NoChampionDeal[];
+}
+
+// The book's silent leak: hot accounts the seller has literally never
+// touched — no contacts, no notes, no cadence, never in pipeline. Heat uses
+// the same shared formula as Hot Leads / the map so flags agree.
+export function neverEngagedHot(limit = 8): NeverEngagedAccount[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT c.id AS companyId, c.name, c.fitScore, c.signals
+       FROM companies c
+       WHERE c.pipelineStage IS NULL
+         AND c.discovered = 0
+         AND c.status IN ('prospect', 'researched')
+         AND NOT EXISTS (SELECT 1 FROM contacts ct WHERE ct.companyId = c.id)
+         AND NOT EXISTS (SELECT 1 FROM sequences s WHERE s.companyId = c.id)
+         AND NOT EXISTS (
+           SELECT 1 FROM company_events e
+           WHERE e.companyId = c.id AND e.type = 'note'
+         )
+       ORDER BY c.fitScore DESC
+       LIMIT 100`
+    )
+    .all() as { companyId: number; name: string; fitScore: number; signals: string }[];
+  return rows
+    .map((r) => {
+      let n = 0;
+      try {
+        n = (JSON.parse(r.signals || "[]") as unknown[]).length;
+      } catch {
+        /* malformed signals JSON — count as none */
+      }
+      return {
+        companyId: r.companyId,
+        name: r.name,
+        heat: r.fitScore + Math.min(n * 4, 16),
+      };
+    })
+    .filter((r) => r.heat >= HOT_THRESHOLD)
+    .sort((a, b) => b.heat - a.heat)
+    .slice(0, limit);
 }
 
 export function markResearched(id: number) {

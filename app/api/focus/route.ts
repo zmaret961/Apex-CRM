@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   intelSummary,
+  neverEngagedHot,
   noChampionDeals,
   noSequenceDeals,
   pipelineCounts,
@@ -20,5 +21,6 @@ export function GET() {
     sequenceDue: sequencesDue(),
     noChampion: noChampionDeals(),
     noSequence: noSequenceDeals(),
+    neverEngaged: neverEngagedHot(),
   });
 }

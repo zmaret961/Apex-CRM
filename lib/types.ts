@@ -121,6 +121,12 @@ export interface NoChampionDeal {
   pipelineStage: PipelineStage;
 }
 
+export interface NeverEngagedAccount {
+  companyId: number;
+  name: string;
+  heat: number;
+}
+
 export interface Contact {
   id: number;
   companyId: number;
