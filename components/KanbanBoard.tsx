@@ -108,13 +108,7 @@ export default function KanbanBoard() {
       (c) => c.pipelineStage !== "Closed Won" && c.pipelineStage !== "Closed Lost"
     );
     const won = companies.filter((c) => c.pipelineStage === "Closed Won");
-    const parse = (v: string | null): number | null => {
-      if (!v) return null;
-      const m = v.match(/\$(\d+(?:\.\d+)?)\s*([kKmM])?/);
-      if (!m) return null;
-      const n = parseFloat(m[1]);
-      return m[2]?.toLowerCase() === "m" ? n * 1_000_000 : m[2]?.toLowerCase() === "k" ? n * 1_000 : n;
-    };
+    const parse = parseMoney;
     let openValue = 0;
     let weighted = 0;
     let unpriced = 0;
@@ -229,8 +223,15 @@ function Column({
         >
           {stage}
         </h3>
-        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-gray-500">
-          {items.length}
+        <span className="flex items-center gap-1.5">
+          {items.reduce((s, c) => s + (parseMoney(c.estimatedValue) ?? 0), 0) > 0 && (
+            <span className="text-[11px] font-medium text-emerald-300/80">
+              {fmtMoney(items.reduce((s, c) => s + (parseMoney(c.estimatedValue) ?? 0), 0))}
+            </span>
+          )}
+          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-gray-500">
+            {items.length}
+          </span>
         </span>
       </div>
       <div className="space-y-2.5">
@@ -256,6 +257,14 @@ const STAGE_PROBABILITY: Record<PipelineStage, number> = {
   "Closed Won": 1,
   "Closed Lost": 0,
 };
+
+function parseMoney(v: string | null): number | null {
+  if (!v) return null;
+  const m = v.match(/\$(\d+(?:\.\d+)?)\s*([kKmM])?/);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  return m[2]?.toLowerCase() === "m" ? n * 1_000_000 : m[2]?.toLowerCase() === "k" ? n * 1_000 : n;
+}
 
 function fmtMoney(v: number): string {
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
