@@ -385,6 +385,14 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                 >
                   View on map ↗
                 </a>
+                <a
+                  href={`/call-sheet/${company.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-0.5 block text-xs text-gray-500 hover:text-accent-soft"
+                >
+                  Call sheet ↗
+                </a>
               </div>
               <button
                 onClick={onClose}
