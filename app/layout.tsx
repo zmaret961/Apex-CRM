@@ -6,6 +6,14 @@ import CommandPalette from "@/components/CommandPalette";
 export const metadata: Metadata = {
   title: "Apex — NYC Prospecting CRM",
   description: "Prospecting CRM for selling Devin to NYC enterprises.",
+  icons: {
+    icon: [
+      { url: "/apex-mark.svg", type: "image/svg+xml" },
+      { url: "/icon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

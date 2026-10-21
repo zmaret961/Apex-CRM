@@ -20,6 +20,8 @@ export default function Nav() {
   return (
     <header className="fixed inset-x-0 top-0 z-40 flex items-center justify-between px-6 py-3">
       <div className="glass pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-2">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/apex-mark.svg" alt="" className="h-7 w-7" />
         <span className="bg-gradient-to-br from-accent-soft to-violet-400 bg-clip-text text-lg font-semibold tracking-tight text-transparent">
           Apex
         </span>
