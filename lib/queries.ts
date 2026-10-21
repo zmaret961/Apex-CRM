@@ -714,7 +714,17 @@ export function intelSummary(): IntelSummary {
   }
 
   const tools = [...map.values()]
-    .map((t) => ({ tool: t.tool, url: t.url, mentions: t.mentions, accounts: [...t.accounts].sort() }))
+    .map((t) => {
+      const rival = RIVALS.find((r) => r.tool === t.tool);
+      return {
+        tool: t.tool,
+        url: t.url,
+        tier: (rival?.tier ?? "competitor") as "cognition" | "competitor",
+        angle: rival?.angle ?? "",
+        mentions: t.mentions,
+        accounts: [...t.accounts].sort(),
+      };
+    })
     .sort((a, b) => b.mentions - a.mentions);
 
   return {

@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/", label: "Map", icon: "◉" },
   { href: "/focus", label: "Focus", icon: "◎" },
   { href: "/hot-leads", label: "Hot Leads", icon: "🔥" },
+  { href: "/battlecards", label: "Battlecards", icon: "⚔" },
   { href: "/opportunities", label: "Opportunities", icon: "⬡" },
   { href: "/accounts", label: "Accounts", icon: "▦" },
   { href: "/research", label: "Research", icon: "◈" },

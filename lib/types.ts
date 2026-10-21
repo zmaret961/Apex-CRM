@@ -158,6 +158,8 @@ export interface FocusItem {
 export interface IntelTool {
   tool: string;
   url: string;
+  tier: "cognition" | "competitor"; // Windsurf = Cognition product (warm path)
+  angle: string;                  // talk track for this rival
   mentions: number;
   accounts: string[];
 }
