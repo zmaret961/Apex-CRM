@@ -307,7 +307,7 @@ function fmtMoney(v: number): string {
 }
 
 function stageDays(ts: string): number {
-  return Math.max(0, Math.floor((Date.now() - new Date(ts + "Z").getTime()) / 86400000));
+  return Math.max(0, Math.floor((Date.now() - new Date(ts.replace(" ", "T") + "Z").getTime()) / 86400000));
 }
 
 function daysAgo(ts: string): string {

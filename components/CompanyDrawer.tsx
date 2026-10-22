@@ -1131,7 +1131,7 @@ function relTime(ts: string) {
               {company.pipelineStage != null
                 ? `In pipeline — ${company.pipelineStage}${
                     company.stageChangedAt
-                      ? ` · ${Math.max(0, Math.floor((Date.now() - new Date(company.stageChangedAt + "Z").getTime()) / 86400000))}d`
+                      ? ` · ${Math.max(0, Math.floor((Date.now() - new Date(company.stageChangedAt.replace(" ", "T") + "Z").getTime()) / 86400000))}d`
                       : ""
                   }`
                 : added

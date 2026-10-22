@@ -533,7 +533,7 @@ export function coolingDeals(limit = 8): CoolingDeal[] {
     pipelineStage: r.pipelineStage,
     daysSinceTouch:
       r.lastTouch && r.lastTouch !== "2000-01-01"
-        ? Math.max(1, Math.floor((Date.now() - new Date(r.lastTouch + "Z").getTime()) / 86400000))
+        ? Math.max(1, Math.floor((Date.now() - new Date(r.lastTouch.replace(" ", "T") + "Z").getTime()) / 86400000))
         : null,
   }));
 }
@@ -766,7 +766,7 @@ export function suggestedActions(limit = 12): FocusItem[] {
       action: "re-research",
       label: "Re-engage (stuck deal)",
       reason: c.stageChangedAt
-        ? `${Math.max(1, Math.floor((Date.now() - new Date(c.stageChangedAt + "Z").getTime()) / 86400000))}d in ${c.pipelineStage} with no stage movement — a fresh signal gives you a reason to re-open the thread.`
+        ? `${Math.max(1, Math.floor((Date.now() - new Date(c.stageChangedAt.replace(" ", "T") + "Z").getTime()) / 86400000))}d in ${c.pipelineStage} with no stage movement — a fresh signal gives you a reason to re-open the thread.`
         : `In ${c.pipelineStage} with no recorded stage movement — a fresh signal gives you a reason to re-open the thread.`,
     });
   }

@@ -10,7 +10,7 @@ function touchLabel(lastTouchAt: string | null) {
   if (!lastTouchAt) return { text: "never touched", cold: true };
   const d = Math.max(
     0,
-    Math.floor((Date.now() - new Date(lastTouchAt + "Z").getTime()) / 86400000)
+    Math.floor((Date.now() - new Date(lastTouchAt.replace(" ", "T") + "Z").getTime()) / 86400000)
   );
   return {
     text: d === 0 ? "touched today" : d === 1 ? "touched yesterday" : `touched ${d}d ago`,

@@ -367,7 +367,7 @@ export default function AccountsList() {
                   return <span className="text-amber-300/70">never touched</span>;
                 const d = Math.max(
                   0,
-                  Math.floor((Date.now() - new Date(c.lastTouchAt + "Z").getTime()) / 86400000)
+                  Math.floor((Date.now() - new Date(c.lastTouchAt.replace(" ", "T") + "Z").getTime()) / 86400000)
                 );
                 return (
                   <span className={d > 14 ? "text-amber-300/70" : "text-gray-600"}>

@@ -46,6 +46,26 @@ export default function HotLeads() {
       .slice(0, 30);
   }, [companies]);
 
+  async function startCadence(c: Company) {
+    setBusy(c.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/companies/${c.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startSequence: true }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error ?? `Couldn't start a cadence on ${c.name}.`);
+        return;
+      }
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function addToPipeline(c: Company) {
     setBusy(c.id);
     setError(null);
@@ -103,6 +123,27 @@ export default function HotLeads() {
                       {c.pipelineStage}
                     </span>
                   )}
+                  {c.sequenceProgress && (
+                    <span
+                      className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent-soft"
+                      title="Outreach cadence progress"
+                    >
+                      {c.sequenceProgress.done}/{c.sequenceProgress.total} touches
+                    </span>
+                  )}
+                  {(() => {
+                    if (!c.lastTouchAt)
+                      return <span className="text-[11px] text-amber-300/70">never touched</span>;
+                    const d = Math.max(
+                      0,
+                      Math.floor((Date.now() - new Date(c.lastTouchAt.replace(" ", "T") + "Z").getTime()) / 86400000)
+                    );
+                    return (
+                      <span className={clsx("text-[11px]", d > 14 ? "text-amber-300/70" : "text-gray-600")}>
+                        touched {d === 0 ? "today" : d === 1 ? "yesterday" : `${d}d ago`}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-gray-400">{whyHot(c)}</p>
                 <div className="mt-3 flex items-center gap-2">
@@ -119,6 +160,16 @@ export default function HotLeads() {
                       className="interactive rounded-lg bg-accent-soft/10 px-2.5 py-1 text-xs font-medium text-accent-soft hover:bg-accent-soft/20 disabled:opacity-50"
                     >
                       {busy === c.id ? "Adding…" : "+ Pipeline"}
+                    </button>
+                  )}
+                  {!c.sequenceProgress && c.status !== "competitor" && c.status !== "customer" && (
+                    <button
+                      onClick={() => startCadence(c)}
+                      disabled={busy === c.id}
+                      className="interactive rounded-lg bg-violet-400/10 px-2.5 py-1 text-xs font-medium text-violet-300 hover:bg-violet-400/20 disabled:opacity-50"
+                      title="Start the 5-touch outreach sequence"
+                    >
+                      {busy === c.id ? "Starting…" : "▶ cadence"}
                     </button>
                   )}
                 </div>

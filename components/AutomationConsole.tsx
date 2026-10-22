@@ -191,7 +191,7 @@ export default function AutomationConsole() {
           {(state?.log ?? []).map((e) => (
             <div key={e.id} className="flex gap-3">
               <span className="shrink-0 text-gray-600">
-                {new Date(e.ts + "Z").toLocaleTimeString()}
+                {new Date(e.ts.replace(" ", "T") + "Z").toLocaleTimeString()}
               </span>
               <span
                 className={clsx(
