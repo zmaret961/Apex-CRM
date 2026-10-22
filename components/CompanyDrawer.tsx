@@ -111,6 +111,22 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [companyId, onClose]);
 
+// Relative timestamps for the activity timeline — "2h ago" reads faster
+// than a full datetime (absolute value stays on hover). Replaces the old
+// `e.ts + "Z"` parse, which produced a non-ISO string some browsers
+// treated as local time instead of UTC.
+function relTime(ts: string) {
+  const d = new Date(ts.replace(" ", "T") + "Z");
+  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
   // One-click touch log — calls and meetings happen off-cadence; recording
   // them as note events keeps last-touch, the cooling radar, and the digest
   // honest without making the seller type a note.
@@ -1040,8 +1056,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="leading-snug text-gray-300">{e.text}</p>
-                      <p className="text-[11px] text-gray-600">
-                        {new Date(e.ts + "Z").toLocaleString()}
+                      <p className="text-[11px] text-gray-600" title={e.ts + " UTC"}>
+                        {relTime(e.ts)}
                       </p>
                     </div>
                     {e.type === "note" && (

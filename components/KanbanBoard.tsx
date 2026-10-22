@@ -408,6 +408,16 @@ function Card({
                 no champion
               </span>
             )}
+          {company.pipelineStage &&
+            !["Closed Won", "Closed Lost"].includes(company.pipelineStage) &&
+            !company.sequenceProgress && (
+              <span
+                className="text-[10px] font-medium text-violet-300/80"
+                title="No outreach cadence running on this deal — open the profile and start one"
+              >
+                no cadence
+              </span>
+            )}
           <span
             className={
               company.stageChangedAt && stageDays(company.stageChangedAt) > 30
