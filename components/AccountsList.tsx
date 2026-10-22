@@ -211,6 +211,35 @@ export default function AccountsList() {
     setRefreshKey((k) => k + 1);
   }
 
+  // startSequence uses INSERT OR REPLACE — it would silently restart any
+  // running cadence, so only accounts without one are eligible.
+  async function bulkCadence() {
+    const eligible = companies.filter(
+      (c) => checked.has(c.id) && !c.sequenceProgress && c.status !== "competitor"
+    );
+    const skipped = checked.size - eligible.length;
+    if (eligible.length === 0) {
+      setBulkNote("Nothing to arm — already cadenced or competitors");
+      return;
+    }
+    setBulkBusy(true);
+    const results = await Promise.all(
+      eligible.map((c) =>
+        fetch(`/api/companies/${c.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ startSequence: true }),
+        }).then((r) => r.ok)
+      )
+    );
+    setBulkBusy(false);
+    setBulkNote(
+      `Cadences started on ${results.filter(Boolean).length}${skipped ? ` · ${skipped} skipped` : ""}`
+    );
+    setChecked(new Set());
+    setRefreshKey((k) => k + 1);
+  }
+
   return (
     <>
       <div className="glass mb-5 flex flex-wrap items-center gap-2 rounded-2xl px-4 py-2.5">
@@ -388,6 +417,14 @@ export default function AccountsList() {
             className="interactive rounded-lg border border-accent/40 bg-accent/15 px-2.5 py-1 text-xs font-medium text-accent-soft disabled:opacity-40"
           >
             Add to pipeline
+          </button>
+          <button
+            disabled={bulkBusy}
+            onClick={bulkCadence}
+            title="Start the 5-touch outreach cadence on every selected account that doesn't have one"
+            className="interactive rounded-lg border border-violet-400/40 bg-violet-500/15 px-2.5 py-1 text-xs font-medium text-violet-300 disabled:opacity-40"
+          >
+            ▶ Cadences
           </button>
           <button
             disabled={bulkBusy}
