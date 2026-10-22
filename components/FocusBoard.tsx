@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { CoolingDeal, FocusItem, IntelSummary, JobStatus, NeverEngagedAccount, NoChampionDeal, SequenceDue } from "@/lib/types";
+import type { CoolingDeal, FocusItem, IntelSummary, JobStatus, NeverEngagedAccount, NoChampionDeal, SequenceDue, UpcomingTouch } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import CompanyDrawer from "./CompanyDrawer";
 import clsx from "clsx";
@@ -16,6 +16,7 @@ interface FocusData {
   noSequence: NoChampionDeal[];
   neverEngaged: NeverEngagedAccount[];
   cooling: CoolingDeal[];
+  upcoming: UpcomingTouch[];
 }
 
 const STAGE_ORDER = [
@@ -275,6 +276,51 @@ export default function FocusBoard() {
             )}
             {pending.length} suggestion{pending.length === 1 ? "" : "s"} open
           </span>
+        </div>
+      )}
+      {(data?.upcoming ?? []).length > 0 && (
+        <div className="glass rounded-2xl p-4">
+          <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+            Week ahead · {data!.upcoming.length} touch{data!.upcoming.length === 1 ? "" : "es"} scheduled
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+            {[1, 2, 3, 4, 5, 6, 7].map((offset) => {
+              const touches = data!.upcoming.filter((t) => t.dueInDays === offset);
+              const date = new Date(Date.now() + offset * 86400000);
+              return (
+                <div key={offset} className="rounded-xl border border-white/5 bg-white/[0.02] p-2">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                      {offset === 1 ? "Tomorrow" : date.toLocaleDateString("en-US", { weekday: "short" })}
+                    </span>
+                    <span className="text-[10px] text-gray-600">
+                      {date.toLocaleDateString("en-US", { month: "numeric", day: "numeric" })}
+                    </span>
+                  </div>
+                  {touches.length === 0 ? (
+                    <div className="mt-2 text-[11px] text-gray-700">—</div>
+                  ) : (
+                    <div className="mt-1.5 space-y-1">
+                      {touches.slice(0, 3).map((t) => (
+                        <button
+                          key={`up-${t.companyId}-${t.stepIndex}`}
+                          onClick={() => setSelected(t.companyId)}
+                          className="block w-full truncate text-left text-[11px] text-gray-300 hover:text-accent-soft"
+                          title={`${t.name} — Day ${t.day}: ${t.label}`}
+                        >
+                          {t.name}
+                          <span className="ml-1 text-gray-600">D{t.day}</span>
+                        </button>
+                      ))}
+                      {touches.length > 3 && (
+                        <div className="text-[10px] text-gray-600">+{touches.length - 3} more</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">

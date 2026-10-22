@@ -17,6 +17,7 @@ import type {
   IntelSummary,
   Sequence,
   SequenceDue,
+  UpcomingTouch,
   SequenceStep,
   NoChampionDeal,
   NeverEngagedAccount,
@@ -334,6 +335,41 @@ export function sequencesDue(): SequenceDue[] {
     });
   }
   return out.sort((a, b) => b.overdue - a.overdue);
+}
+
+// Every undone sequence touch landing in the next `days` days — the
+// forward-looking view sellers plan their week from (overdue and due-today
+// items already surface in sequencesDue, so this only looks ahead).
+export function upcomingTouches(days = 7): UpcomingTouch[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT s.companyId, s.startedAt, s.steps, c.name
+       FROM sequences s JOIN companies c ON c.id = s.companyId
+       WHERE c.discovered = 0 AND c.status != 'competitor'`
+    )
+    .all() as { companyId: number; startedAt: string; steps: string; name: string }[];
+  const now = Date.now();
+  const out: UpcomingTouch[] = [];
+  for (const r of rows) {
+    const steps = JSON.parse(r.steps) as SequenceStep[];
+    const elapsed = Math.floor(
+      (now - new Date(r.startedAt.replace(" ", "T") + "Z").getTime()) / 86400000
+    );
+    for (let i = 0; i < steps.length; i++) {
+      const dueInDays = steps[i].day - elapsed;
+      if (steps[i].done || dueInDays < 1 || dueInDays > days) continue;
+      out.push({
+        companyId: r.companyId,
+        name: r.name,
+        stepIndex: i,
+        day: steps[i].day,
+        label: steps[i].label,
+        dueInDays,
+      });
+    }
+  }
+  return out.sort((a, b) => a.dueInDays - b.dueInDays || a.day - b.day);
 }
 
 // Open pipeline deals with no starred champion contact — a deal without a

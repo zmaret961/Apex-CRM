@@ -108,6 +108,7 @@ export interface SequenceDue {
   overdue: number; // days past its scheduled day; 0 = due today
 }
 
+
 export interface AccountIntel {
   tool: string;
   url: string;
@@ -133,6 +134,15 @@ export interface CoolingDeal {
   name: string;
   pipelineStage: PipelineStage;
   daysSinceTouch: number | null; // null = never touched
+}
+
+export interface UpcomingTouch {
+  companyId: number;
+  name: string;
+  stepIndex: number;
+  day: number;
+  label: string;
+  dueInDays: number; // days until this touch lands (1 = tomorrow)
 }
 
 export interface Contact {

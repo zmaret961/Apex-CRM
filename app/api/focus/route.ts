@@ -8,6 +8,7 @@ import {
   pipelineCounts,
   sequencesDue,
   suggestedActions,
+  upcomingTouches,
   weeklyDigest,
 } from "@/lib/queries";
 
@@ -24,5 +25,6 @@ export function GET() {
     noSequence: noSequenceDeals(),
     neverEngaged: neverEngagedHot(),
     cooling: coolingDeals(),
+    upcoming: upcomingTouches(),
   });
 }
