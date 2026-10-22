@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { PersonRow } from "@/lib/types";
 import CompanyDrawer from "./CompanyDrawer";
 import clsx from "clsx";
@@ -18,8 +19,9 @@ function touchLabel(lastTouchAt: string | null) {
 }
 
 export default function PeopleList() {
+  const searchParams = useSearchParams();
   const [people, setPeople] = useState<PersonRow[] | null>(null);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(() => searchParams.get("q") ?? "");
   const [champOnly, setChampOnly] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
 
