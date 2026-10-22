@@ -58,6 +58,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [restoring, setRestoring] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [patchError, setPatchError] = useState<string | null>(null);
+  const [touchOpen, setTouchOpen] = useState(false);
+  const [touchDone, setTouchDone] = useState(false);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -108,6 +110,16 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [companyId, onClose]);
+
+  // One-click touch log — calls and meetings happen off-cadence; recording
+  // them as note events keeps last-touch, the cooling radar, and the digest
+  // honest without making the seller type a note.
+  async function logTouch(kind: string) {
+    setTouchOpen(false);
+    await patch({ note: `Touch logged — ${kind}` });
+    setTouchDone(true);
+    setTimeout(() => setTouchDone(false), 2000);
+  }
 
   async function patch(body: Record<string, unknown>) {
     if (!company) return;
@@ -510,6 +522,28 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
             <div className="flex items-center gap-3">
               <StatusPill status={company.status} />
               <FitScore score={company.fitScore} />
+              <div className="relative">
+                <button
+                  onClick={() => setTouchOpen((v) => !v)}
+                  className="interactive rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-400/20"
+                  title="Log a call, email, or meeting — updates last-touch across every surface"
+                >
+                  {touchDone ? "Logged ✓" : "✓ Touch"}
+                </button>
+                {touchOpen && (
+                  <div className="absolute right-0 top-full z-30 mt-1 w-32 rounded-xl border border-white/10 bg-[#0b0f14] p-1 shadow-2xl">
+                    {["call", "email", "meeting", "LinkedIn"].map((k) => (
+                      <button
+                        key={k}
+                        onClick={() => logTouch(k)}
+                        className="block w-full rounded-lg px-2.5 py-1.5 text-left text-xs capitalize text-gray-300 hover:bg-white/5 hover:text-white"
+                      >
+                        {k}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button
                 onClick={copyOutreachBrief}
                 className="interactive ml-auto rounded-lg border border-white/10 px-2.5 py-1 text-xs text-gray-400 hover:border-accent/40 hover:text-white"
