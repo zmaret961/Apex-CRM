@@ -218,21 +218,41 @@ export function execsFor(companyId: number): Exec[] {
     .all(companyId) as Exec[];
 }
 
-// Every saved contact joined to its account — the People page. Champions
-// first, then grouped by account. lastTouchAt is the same seller-touch
-// definition used by the account cards and the cooling radar.
+// The People directory: every sourced org-chart exec UNION every saved
+// contact that isn't an exec row. An exec already in contacts keeps its
+// contact row (champion, url, notes); an unsaved exec gets a synthetic
+// negative id so list keys stay unique and the UI can offer "save".
 export function listContacts(): PersonRow[] {
   const db = getDb();
   return db
     .prepare(
-      `SELECT ct.*, c.name AS companyName, c.pipelineStage,
-         (SELECT MAX(ce.ts) FROM company_events ce
-           WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouchAt
-       FROM contacts ct JOIN companies c ON c.id = ct.companyId
-       WHERE c.discovered = 0
-       ORDER BY ct.champion DESC, c.name ASC, ct.id ASC`
+      `SELECT * FROM (
+         SELECT COALESCE(ct.id, -e.id) AS id, c.id AS companyId,
+           e.name, e.role, COALESCE(ct.url, '') AS url,
+           COALESCE(ct.notes, '') AS notes, COALESCE(ct.champion, 0) AS champion,
+           COALESCE(ct.createdAt, '') AS createdAt,
+           c.name AS companyName, c.pipelineStage,
+           (SELECT MAX(ce.ts) FROM company_events ce
+             WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouchAt,
+           (ct.id IS NOT NULL) AS saved, e.id AS execId
+         FROM execs e JOIN companies c ON c.id = e.companyId
+         LEFT JOIN contacts ct ON ct.companyId = e.companyId AND ct.name = e.name
+         WHERE c.discovered = 0
+         UNION ALL
+         SELECT ct.id, c.id, ct.name, ct.role, ct.url, ct.notes, ct.champion,
+           ct.createdAt, c.name, c.pipelineStage,
+           (SELECT MAX(ce.ts) FROM company_events ce
+             WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')),
+           1, NULL
+         FROM contacts ct JOIN companies c ON c.id = ct.companyId
+         WHERE c.discovered = 0
+           AND NOT EXISTS (SELECT 1 FROM execs e
+             WHERE e.companyId = ct.companyId AND e.name = ct.name)
+       )
+       ORDER BY champion DESC, saved DESC, companyName ASC, name ASC`
     )
-    .all() as PersonRow[];
+    .all()
+    .map((r) => ({ ...(r as PersonRow), saved: !!(r as PersonRow).saved }));
 }
 
 export function contactsFor(companyId: number): Contact[] {
