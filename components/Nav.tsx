@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/opportunities", label: "Opportunities", icon: "⬡" },
   { href: "/accounts", label: "Accounts", icon: "▦" },
   { href: "/people", label: "People", icon: "◍" },
+  { href: "/activity", label: "Activity", icon: "◷" },
   { href: "/research", label: "Research", icon: "◈" },
   { href: "/automation", label: "Automation", icon: "⚡" },
   { href: "/integrations", label: "Integrations", icon: "🧩" },

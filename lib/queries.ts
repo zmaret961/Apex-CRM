@@ -24,6 +24,7 @@ import type {
   CoolingDeal,
   AccountIntel,
   PersonRow,
+  TimelineEvent,
 } from "./types";
 
 export const VALID_STATUSES: CompanyStatus[] = ["customer", "prospect", "researched", "competitor"];
@@ -187,6 +188,20 @@ export function deleteNote(companyId: number, eventId: number): boolean {
     .prepare("DELETE FROM company_events WHERE id = ? AND companyId = ? AND type = 'note'")
     .run(eventId, companyId);
   return r.changes > 0;
+}
+
+// Book-wide event feed — everything the system and the seller logged,
+// newest first. Powers the Activity page.
+export function listEvents(limit = 300): TimelineEvent[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT ce.*, c.name AS companyName
+       FROM company_events ce JOIN companies c ON c.id = ce.companyId
+       WHERE c.discovered = 0
+       ORDER BY ce.id DESC LIMIT ?`
+    )
+    .all(limit) as TimelineEvent[];
 }
 
 export function eventsFor(companyId: number): CompanyEvent[] {

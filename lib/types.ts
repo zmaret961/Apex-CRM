@@ -171,6 +171,11 @@ export interface CompanyEvent {
   text: string;
 }
 
+// A company_event joined to its account for the book-wide Activity feed.
+export interface TimelineEvent extends CompanyEvent {
+  companyName: string;
+}
+
 export type FocusActionType = "research" | "advance" | "re-research";
 
 export interface FocusItem {
