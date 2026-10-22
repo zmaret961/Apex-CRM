@@ -20,6 +20,7 @@ import type {
   SequenceStep,
   NoChampionDeal,
   NeverEngagedAccount,
+  CoolingDeal,
   AccountIntel,
 } from "./types";
 
@@ -426,6 +427,46 @@ export function neverEngagedHot(limit = 8): NeverEngagedAccount[] {
     .filter((r) => r.heat >= HOT_THRESHOLD)
     .sort((a, b) => b.heat - a.heat)
     .slice(0, limit);
+}
+
+// Pipeline deals going cold: open stage + no seller touch in 7+ days (or
+// never). Distinct from stale-stage — a deal can move stages and still go
+// untouched. Furthest-along first, same ordering as the other gap radars.
+export function coolingDeals(limit = 8): CoolingDeal[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT c.id AS companyId, c.name, c.pipelineStage,
+         (SELECT MAX(ce.ts) FROM company_events ce
+           WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouch
+       FROM companies c
+       WHERE c.pipelineStage IS NOT NULL
+         AND c.pipelineStage NOT IN ('Closed Won', 'Closed Lost')
+         AND c.discovered = 0 AND c.status != 'competitor'
+         AND COALESCE(
+           (SELECT MAX(ce.ts) FROM company_events ce
+             WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')),
+           '2000-01-01'
+         ) < datetime('now', '-7 days')
+       ORDER BY CASE c.pipelineStage
+                  WHEN 'Proposal' THEN 0
+                  WHEN 'Demo Scheduled' THEN 1
+                  WHEN 'Engaged' THEN 2
+                  ELSE 3
+                END,
+                c.fitScore DESC
+       LIMIT ?`
+    )
+    .all(limit) as { companyId: number; name: string; pipelineStage: PipelineStage; lastTouch: string | null }[];
+  return rows.map((r) => ({
+    companyId: r.companyId,
+    name: r.name,
+    pipelineStage: r.pipelineStage,
+    daysSinceTouch:
+      r.lastTouch && r.lastTouch !== "2000-01-01"
+        ? Math.max(1, Math.floor((Date.now() - new Date(r.lastTouch + "Z").getTime()) / 86400000))
+        : null,
+  }));
 }
 
 export function markResearched(id: number) {

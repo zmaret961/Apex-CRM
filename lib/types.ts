@@ -128,6 +128,13 @@ export interface NeverEngagedAccount {
   heat: number;
 }
 
+export interface CoolingDeal {
+  companyId: number;
+  name: string;
+  pipelineStage: PipelineStage;
+  daysSinceTouch: number | null; // null = never touched
+}
+
 export interface Contact {
   id: number;
   companyId: number;

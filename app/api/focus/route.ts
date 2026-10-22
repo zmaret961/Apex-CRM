@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  coolingDeals,
   intelSummary,
   neverEngagedHot,
   noChampionDeals,
@@ -22,5 +23,6 @@ export function GET() {
     noChampion: noChampionDeals(),
     noSequence: noSequenceDeals(),
     neverEngaged: neverEngagedHot(),
+    cooling: coolingDeals(),
   });
 }

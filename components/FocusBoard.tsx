@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { FocusItem, IntelSummary, JobStatus, NeverEngagedAccount, NoChampionDeal, SequenceDue } from "@/lib/types";
+import type { CoolingDeal, FocusItem, IntelSummary, JobStatus, NeverEngagedAccount, NoChampionDeal, SequenceDue } from "@/lib/types";
 import StatusPill from "./StatusPill";
 import CompanyDrawer from "./CompanyDrawer";
 import clsx from "clsx";
@@ -15,6 +15,7 @@ interface FocusData {
   noChampion: NoChampionDeal[];
   noSequence: NoChampionDeal[];
   neverEngaged: NeverEngagedAccount[];
+  cooling: CoolingDeal[];
 }
 
 const STAGE_ORDER = [
@@ -229,6 +230,7 @@ export default function FocusBoard() {
             ...d,
             noSequence: d.noSequence.filter((x) => x.companyId !== companyId),
             neverEngaged: d.neverEngaged.filter((x) => x.companyId !== companyId),
+            cooling: d.cooling.filter((x) => x.companyId !== companyId),
           }
         : d
     );
@@ -374,6 +376,40 @@ export default function FocusBoard() {
                     {d.name}
                     <span className="ml-2 text-xs text-amber-300/80">heat {d.heat}</span>
                     <span className="ml-2 text-xs text-gray-600">no contacts · no notes · no cadence</span>
+                  </button>
+                  <button
+                    onClick={() => startCadence(d.companyId)}
+                    disabled={busy === d.companyId}
+                    title="Start the 5-touch sequence"
+                    className="interactive shrink-0 rounded-lg border border-accent/40 bg-accent/10 px-2 py-0.5 text-[11px] text-accent-soft hover:bg-accent/20 disabled:opacity-40"
+                  >
+                    {busy === d.companyId ? "…" : "start cadence"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {(data?.cooling ?? []).length > 0 && (
+          <div className="glass rounded-2xl p-4">
+            <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+              🧊 Deals going cold · {data!.cooling.length}
+            </div>
+            <div className="space-y-1">
+              {data!.cooling.map((d) => (
+                <div
+                  key={`cool-${d.companyId}`}
+                  className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm"
+                >
+                  <button
+                    onClick={() => setSelected(d.companyId)}
+                    className="min-w-0 flex-1 truncate text-left text-white hover:text-accent-soft"
+                  >
+                    {d.name}
+                    <span className="ml-2 text-xs text-gray-500">{d.pipelineStage}</span>
+                    <span className="ml-2 text-xs text-sky-300/80">
+                      {d.daysSinceTouch === null ? "never touched" : `no touch in ${d.daysSinceTouch}d`}
+                    </span>
                   </button>
                   <button
                     onClick={() => startCadence(d.companyId)}
