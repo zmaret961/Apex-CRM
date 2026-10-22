@@ -23,6 +23,7 @@ import type {
   NeverEngagedAccount,
   CoolingDeal,
   AccountIntel,
+  PersonRow,
 } from "./types";
 
 export const VALID_STATUSES: CompanyStatus[] = ["customer", "prospect", "researched", "competitor"];
@@ -200,6 +201,23 @@ export function execsFor(companyId: number): Exec[] {
   return db
     .prepare("SELECT * FROM execs WHERE companyId = ? ORDER BY id ASC LIMIT 12")
     .all(companyId) as Exec[];
+}
+
+// Every saved contact joined to its account — the People page. Champions
+// first, then grouped by account. lastTouchAt is the same seller-touch
+// definition used by the account cards and the cooling radar.
+export function listContacts(): PersonRow[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT ct.*, c.name AS companyName, c.pipelineStage,
+         (SELECT MAX(ce.ts) FROM company_events ce
+           WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouchAt
+       FROM contacts ct JOIN companies c ON c.id = ct.companyId
+       WHERE c.discovered = 0
+       ORDER BY ct.champion DESC, c.name ASC, ct.id ASC`
+    )
+    .all() as PersonRow[];
 }
 
 export function contactsFor(companyId: number): Contact[] {

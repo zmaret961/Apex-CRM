@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/battlecards", label: "Battlecards", icon: "⚔" },
   { href: "/opportunities", label: "Opportunities", icon: "⬡" },
   { href: "/accounts", label: "Accounts", icon: "▦" },
+  { href: "/people", label: "People", icon: "◍" },
   { href: "/research", label: "Research", icon: "◈" },
   { href: "/automation", label: "Automation", icon: "⚡" },
   { href: "/integrations", label: "Integrations", icon: "🧩" },

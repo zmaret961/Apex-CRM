@@ -156,6 +156,13 @@ export interface Contact {
   createdAt: string;
 }
 
+// A contact joined to its account for the People page.
+export interface PersonRow extends Contact {
+  companyName: string;
+  pipelineStage: PipelineStage | null;
+  lastTouchAt: string | null;
+}
+
 export interface CompanyEvent {
   id: number;
   companyId: number;
