@@ -398,6 +398,24 @@ function Card({
               {company.sequenceProgress.done}/{company.sequenceProgress.total} touches
             </span>
           )}
+          {company.nextTouchIn !== undefined && (
+            <span
+              className={
+                company.nextTouchIn < 0
+                  ? "text-[10px] font-medium text-amber-300/80"
+                  : company.nextTouchIn === 0
+                    ? "text-[10px] font-medium text-emerald-300/80"
+                    : "text-[10px] text-gray-600"
+              }
+              title="Next cadence touch"
+            >
+              {company.nextTouchIn < 0
+                ? `${-company.nextTouchIn}d overdue`
+                : company.nextTouchIn === 0
+                  ? "touch due"
+                  : `next in ${company.nextTouchIn}d`}
+            </span>
+          )}
           {company.pipelineStage &&
             !["Closed Won", "Closed Lost"].includes(company.pipelineStage) &&
             !company.hasChampion && (

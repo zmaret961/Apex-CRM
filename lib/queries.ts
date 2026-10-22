@@ -87,7 +87,8 @@ export function listCompanies(opts: {
            WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouchAt,
          EXISTS(SELECT 1 FROM contacts ct
            WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion,
-         (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps
+         (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps,
+         (SELECT s.startedAt FROM sequences s WHERE s.companyId = c.id) AS sequenceStartedAt
        FROM companies c WHERE ${where.join(" AND ")} ORDER BY c.fitScore DESC`
     )
     .all(...args) as RawCompany[];
@@ -105,7 +106,8 @@ export function getCompany(id: number): Company | null {
            WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouchAt,
          EXISTS(SELECT 1 FROM contacts ct
            WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion,
-         (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps
+         (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps,
+         (SELECT s.startedAt FROM sequences s WHERE s.companyId = c.id) AS sequenceStartedAt
        FROM companies c WHERE c.id = ?`
     )
     .get(id) as RawCompany | undefined;
@@ -916,14 +918,23 @@ interface RawCompany extends Omit<Company, "sources" | "signals"> {
 }
 
 function hydrate(row: RawCompany): Company {
-  const { sequenceSteps, ...rest } = row as RawCompany & {
+  const { sequenceSteps, sequenceStartedAt, ...rest } = row as RawCompany & {
     sequenceSteps?: string | null;
+    sequenceStartedAt?: string | null;
   };
   let sequenceProgress: { done: number; total: number } | undefined;
+  let nextTouchIn: number | undefined;
   if (sequenceSteps) {
     try {
-      const steps = JSON.parse(sequenceSteps) as { done: boolean }[];
+      const steps = JSON.parse(sequenceSteps) as { day: number; done: boolean }[];
       sequenceProgress = { done: steps.filter((s) => s.done).length, total: steps.length };
+      const next = steps.find((s) => !s.done);
+      if (next && sequenceStartedAt) {
+        const elapsed = Math.floor(
+          (Date.now() - new Date(sequenceStartedAt.replace(" ", "T") + "Z").getTime()) / 86400000
+        );
+        nextTouchIn = next.day - elapsed;
+      }
     } catch {
       /* malformed steps JSON — skip */
     }
@@ -947,6 +958,7 @@ function hydrate(row: RawCompany): Company {
     sources,
     signals,
     ...(sequenceProgress ? { sequenceProgress } : {}),
+    ...(nextTouchIn !== undefined ? { nextTouchIn } : {}),
   };
 }
 

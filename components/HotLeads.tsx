@@ -131,6 +131,25 @@ export default function HotLeads() {
                       {c.sequenceProgress.done}/{c.sequenceProgress.total} touches
                     </span>
                   )}
+                  {c.nextTouchIn !== undefined && (
+                    <span
+                      className={clsx(
+                        "text-[11px]",
+                        c.nextTouchIn < 0
+                          ? "font-medium text-amber-300/80"
+                          : c.nextTouchIn === 0
+                            ? "font-medium text-emerald-300/80"
+                            : "text-gray-600"
+                      )}
+                      title="Next cadence touch"
+                    >
+                      {c.nextTouchIn < 0
+                        ? `${-c.nextTouchIn}d overdue`
+                        : c.nextTouchIn === 0
+                          ? "touch due"
+                          : `next in ${c.nextTouchIn}d`}
+                    </span>
+                  )}
                   {(() => {
                     if (!c.lastTouchAt)
                       return <span className="text-[11px] text-amber-300/70">never touched</span>;

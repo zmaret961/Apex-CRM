@@ -40,6 +40,7 @@ export interface Company {
   lastTouchAt?: string | null;    // ts of last seller touch (note or pipeline event)
   hasChampion?: number; // sqlite EXISTS() → 0/1: a starred contact exists on this account
   sequenceProgress?: { done: number; total: number }; // parsed from active sequence steps
+  nextTouchIn?: number; // days until the next undone cadence touch lands; <=0 means due now/overdue
 }
 
 export interface Claim {
