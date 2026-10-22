@@ -37,6 +37,7 @@ export interface Company {
   signals: Signal[];
   discovered: number; // 0 = in accounts, 1 = discovered-not-yet-imported
   stageChangedAt?: string | null; // ts of last pipeline move (from company_events)
+  lastTouchAt?: string | null;    // ts of last seller touch (note or pipeline event)
   hasChampion?: number; // sqlite EXISTS() → 0/1: a starred contact exists on this account
   sequenceProgress?: { done: number; total: number }; // parsed from active sequence steps
 }

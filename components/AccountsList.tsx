@@ -16,7 +16,10 @@ const INDUSTRIES = [
 
 const FILTERS_KEY = "apex-accounts-filters";
 
-function loadFilters(): { q: string; industry: string; status: string; stage: string; sort: "heat" | "fit" | "name" | "employees" } {
+type SortKey = "heat" | "fit" | "name" | "employees" | "touch";
+const SORT_KEYS: SortKey[] = ["heat", "fit", "name", "employees", "touch"];
+
+function loadFilters(): { q: string; industry: string; status: string; stage: string; sort: SortKey } {
   const empty = { q: "", industry: "", status: "", stage: "", sort: "heat" as const };
   try {
     const raw = JSON.parse(localStorage.getItem(FILTERS_KEY) ?? "null");
@@ -26,7 +29,7 @@ function loadFilters(): { q: string; industry: string; status: string; stage: st
       industry: typeof raw.industry === "string" ? raw.industry : "",
       status: typeof raw.status === "string" ? raw.status : "",
       stage: typeof raw.stage === "string" ? raw.stage : "",
-      sort: ["heat", "fit", "name", "employees"].includes(raw.sort) ? raw.sort : "heat",
+      sort: SORT_KEYS.includes(raw.sort) ? raw.sort : "heat",
     };
   } catch {
     return empty;
@@ -40,7 +43,7 @@ export default function AccountsList() {
   const [industry, setIndustry] = useState("");
   const [status, setStatus] = useState("");
   const [stage, setStage] = useState("");
-  const [sort, setSort] = useState<"heat" | "fit" | "name" | "employees">("heat");
+  const [sort, setSort] = useState<SortKey>("heat");
   const [selected, setSelected] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -133,6 +136,9 @@ export default function AccountsList() {
           else if (sort === "employees") list.sort((a, b) => b.employees - a.employees);
           else if (sort === "heat") list.sort((a, b) => heat(b) - heat(a));
           else if (sort === "fit") list.sort((a, b) => b.fitScore - a.fitScore);
+          else if (sort === "touch")
+            // coldest first: never-touched accounts surface at the top
+            list.sort((a, b) => (a.lastTouchAt ?? "").localeCompare(b.lastTouchAt ?? ""));
           setCompanies(list);
           setLoaded(true);
         });
@@ -269,6 +275,7 @@ export default function AccountsList() {
         >
           <option value="heat">Sort: heat</option>
           <option value="fit">Sort: fit score</option>
+          <option value="touch">Sort: last touch</option>
           <option value="name">Sort: name</option>
           <option value="employees">Sort: size</option>
         </select>
@@ -353,6 +360,21 @@ export default function AccountsList() {
               <span className="text-[11px] text-gray-600">
                 {c.pipelineStage ? c.pipelineStage : c.funding}
               </span>
+            </div>
+            <div className="mt-1.5 text-[11px]">
+              {(() => {
+                if (!c.lastTouchAt)
+                  return <span className="text-amber-300/70">never touched</span>;
+                const d = Math.max(
+                  0,
+                  Math.floor((Date.now() - new Date(c.lastTouchAt + "Z").getTime()) / 86400000)
+                );
+                return (
+                  <span className={d > 14 ? "text-amber-300/70" : "text-gray-600"}>
+                    touched {d === 0 ? "today" : d === 1 ? "yesterday" : `${d}d ago`}
+                  </span>
+                );
+              })()}
             </div>
           </button>
         ))}

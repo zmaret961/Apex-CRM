@@ -79,6 +79,8 @@ export function listCompanies(opts: {
       `SELECT c.*,
          (SELECT MAX(ce.ts) FROM company_events ce
            WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt,
+         (SELECT MAX(ce.ts) FROM company_events ce
+           WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouchAt,
          EXISTS(SELECT 1 FROM contacts ct
            WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion,
          (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps
@@ -95,6 +97,8 @@ export function getCompany(id: number): Company | null {
       `SELECT c.*,
          (SELECT MAX(ce.ts) FROM company_events ce
            WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt,
+         (SELECT MAX(ce.ts) FROM company_events ce
+           WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouchAt,
          EXISTS(SELECT 1 FROM contacts ct
            WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion,
          (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps
