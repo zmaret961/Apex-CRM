@@ -21,6 +21,8 @@ const NAV: { id: string; label: string; href: string; key: string }[] = [
   { id: "nav-cards", label: "Go to Battlecards", href: "/battlecards", key: "b" },
   { id: "nav-opps", label: "Go to Opportunities", href: "/opportunities", key: "o" },
   { id: "nav-accounts", label: "Go to Accounts", href: "/accounts", key: "a" },
+  { id: "nav-people", label: "Go to People", href: "/people", key: "p" },
+  { id: "nav-activity", label: "Go to Activity", href: "/activity", key: "t" },
   { id: "nav-research", label: "Go to Research", href: "/research", key: "r" },
   { id: "nav-automation", label: "Go to Automation", href: "/automation", key: "u" },
   { id: "nav-integrations", label: "Go to Integrations", href: "/integrations", key: "i" },
@@ -281,7 +283,7 @@ export default function CommandPalette() {
         </div>
         <div className="flex items-center justify-between border-t border-white/10 px-4 py-2 text-[11px] text-gray-600">
           <span>⌘K toggle · ↑↓ select · ↵ run · esc close</span>
-          <span>quick nav: m f h o a r u i</span>
+          <span>quick nav: m f h b o a p t r u i</span>
         </div>
       </div>
     </div>

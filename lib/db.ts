@@ -362,4 +362,10 @@ function applyDataMigrations(db: Database.Database) {
     }
     db.pragma("user_version = 10");
   }
+  if (v < 11) {
+    // Purge fabricated "most likely incumbent" claims written before the
+    // research generator stopped inventing incumbent guesses (rule-1 fix).
+    db.prepare("DELETE FROM research_claims WHERE text LIKE '%most likely incumbent%'").run();
+    db.pragma("user_version = 11");
+  }
 }

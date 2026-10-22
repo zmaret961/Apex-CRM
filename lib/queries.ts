@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { HOT_THRESHOLD } from "./heat";
 import { RIVALS } from "./intel";
 import { PIPELINE_STAGES } from "./types";
 import type {
@@ -16,9 +17,14 @@ import type {
   IntelSummary,
   Sequence,
   SequenceDue,
+  UpcomingTouch,
   SequenceStep,
   NoChampionDeal,
+  NeverEngagedAccount,
+  CoolingDeal,
   AccountIntel,
+  PersonRow,
+  TimelineEvent,
 } from "./types";
 
 export const VALID_STATUSES: CompanyStatus[] = ["customer", "prospect", "researched", "competitor"];
@@ -77,6 +83,8 @@ export function listCompanies(opts: {
       `SELECT c.*,
          (SELECT MAX(ce.ts) FROM company_events ce
            WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt,
+         (SELECT MAX(ce.ts) FROM company_events ce
+           WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouchAt,
          EXISTS(SELECT 1 FROM contacts ct
            WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion,
          (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps
@@ -93,6 +101,8 @@ export function getCompany(id: number): Company | null {
       `SELECT c.*,
          (SELECT MAX(ce.ts) FROM company_events ce
            WHERE ce.companyId = c.id AND ce.type = 'pipeline') AS stageChangedAt,
+         (SELECT MAX(ce.ts) FROM company_events ce
+           WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouchAt,
          EXISTS(SELECT 1 FROM contacts ct
            WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion,
          (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps
@@ -180,6 +190,20 @@ export function deleteNote(companyId: number, eventId: number): boolean {
   return r.changes > 0;
 }
 
+// Book-wide event feed — everything the system and the seller logged,
+// newest first. Powers the Activity page.
+export function listEvents(limit = 300): TimelineEvent[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT ce.*, c.name AS companyName
+       FROM company_events ce JOIN companies c ON c.id = ce.companyId
+       WHERE c.discovered = 0
+       ORDER BY ce.id DESC LIMIT ?`
+    )
+    .all(limit) as TimelineEvent[];
+}
+
 export function eventsFor(companyId: number): CompanyEvent[] {
   const db = getDb();
   return db
@@ -192,6 +216,23 @@ export function execsFor(companyId: number): Exec[] {
   return db
     .prepare("SELECT * FROM execs WHERE companyId = ? ORDER BY id ASC LIMIT 12")
     .all(companyId) as Exec[];
+}
+
+// Every saved contact joined to its account — the People page. Champions
+// first, then grouped by account. lastTouchAt is the same seller-touch
+// definition used by the account cards and the cooling radar.
+export function listContacts(): PersonRow[] {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT ct.*, c.name AS companyName, c.pipelineStage,
+         (SELECT MAX(ce.ts) FROM company_events ce
+           WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouchAt
+       FROM contacts ct JOIN companies c ON c.id = ct.companyId
+       WHERE c.discovered = 0
+       ORDER BY ct.champion DESC, c.name ASC, ct.id ASC`
+    )
+    .all() as PersonRow[];
 }
 
 export function contactsFor(companyId: number): Contact[] {
@@ -329,6 +370,41 @@ export function sequencesDue(): SequenceDue[] {
   return out.sort((a, b) => b.overdue - a.overdue);
 }
 
+// Every undone sequence touch landing in the next `days` days — the
+// forward-looking view sellers plan their week from (overdue and due-today
+// items already surface in sequencesDue, so this only looks ahead).
+export function upcomingTouches(days = 7): UpcomingTouch[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT s.companyId, s.startedAt, s.steps, c.name
+       FROM sequences s JOIN companies c ON c.id = s.companyId
+       WHERE c.discovered = 0 AND c.status != 'competitor'`
+    )
+    .all() as { companyId: number; startedAt: string; steps: string; name: string }[];
+  const now = Date.now();
+  const out: UpcomingTouch[] = [];
+  for (const r of rows) {
+    const steps = JSON.parse(r.steps) as SequenceStep[];
+    const elapsed = Math.floor(
+      (now - new Date(r.startedAt.replace(" ", "T") + "Z").getTime()) / 86400000
+    );
+    for (let i = 0; i < steps.length; i++) {
+      const dueInDays = steps[i].day - elapsed;
+      if (steps[i].done || dueInDays < 1 || dueInDays > days) continue;
+      out.push({
+        companyId: r.companyId,
+        name: r.name,
+        stepIndex: i,
+        day: steps[i].day,
+        label: steps[i].label,
+        dueInDays,
+      });
+    }
+  }
+  return out.sort((a, b) => a.dueInDays - b.dueInDays || a.day - b.day);
+}
+
 // Open pipeline deals with no starred champion contact — a deal without a
 // named internal advocate is the classic stall, so Focus flags the gap.
 // Furthest-along deals first (a championless Proposal hurts most).
@@ -379,6 +455,87 @@ export function noSequenceDeals(limit = 8): NoChampionDeal[] {
        LIMIT ?`
     )
     .all(limit) as NoChampionDeal[];
+}
+
+// The book's silent leak: hot accounts the seller has literally never
+// touched — no contacts, no notes, no cadence, never in pipeline. Heat uses
+// the same shared formula as Hot Leads / the map so flags agree.
+export function neverEngagedHot(limit = 8): NeverEngagedAccount[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT c.id AS companyId, c.name, c.fitScore, c.signals
+       FROM companies c
+       WHERE c.pipelineStage IS NULL
+         AND c.discovered = 0
+         AND c.status IN ('prospect', 'researched')
+         AND NOT EXISTS (SELECT 1 FROM contacts ct WHERE ct.companyId = c.id)
+         AND NOT EXISTS (SELECT 1 FROM sequences s WHERE s.companyId = c.id)
+         AND NOT EXISTS (
+           SELECT 1 FROM company_events e
+           WHERE e.companyId = c.id AND e.type = 'note'
+         )
+       ORDER BY c.fitScore DESC
+       LIMIT 100`
+    )
+    .all() as { companyId: number; name: string; fitScore: number; signals: string }[];
+  return rows
+    .map((r) => {
+      let n = 0;
+      try {
+        n = (JSON.parse(r.signals || "[]") as unknown[]).length;
+      } catch {
+        /* malformed signals JSON — count as none */
+      }
+      return {
+        companyId: r.companyId,
+        name: r.name,
+        heat: r.fitScore + Math.min(n * 4, 16),
+      };
+    })
+    .filter((r) => r.heat >= HOT_THRESHOLD)
+    .sort((a, b) => b.heat - a.heat)
+    .slice(0, limit);
+}
+
+// Pipeline deals going cold: open stage + no seller touch in 7+ days (or
+// never). Distinct from stale-stage — a deal can move stages and still go
+// untouched. Furthest-along first, same ordering as the other gap radars.
+export function coolingDeals(limit = 8): CoolingDeal[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT c.id AS companyId, c.name, c.pipelineStage,
+         (SELECT MAX(ce.ts) FROM company_events ce
+           WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouch
+       FROM companies c
+       WHERE c.pipelineStage IS NOT NULL
+         AND c.pipelineStage NOT IN ('Closed Won', 'Closed Lost')
+         AND c.discovered = 0 AND c.status != 'competitor'
+         AND COALESCE(
+           (SELECT MAX(ce.ts) FROM company_events ce
+             WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')),
+           '2000-01-01'
+         ) < datetime('now', '-7 days')
+       ORDER BY CASE c.pipelineStage
+                  WHEN 'Proposal' THEN 0
+                  WHEN 'Demo Scheduled' THEN 1
+                  WHEN 'Engaged' THEN 2
+                  ELSE 3
+                END,
+                c.fitScore DESC
+       LIMIT ?`
+    )
+    .all(limit) as { companyId: number; name: string; pipelineStage: PipelineStage; lastTouch: string | null }[];
+  return rows.map((r) => ({
+    companyId: r.companyId,
+    name: r.name,
+    pipelineStage: r.pipelineStage,
+    daysSinceTouch:
+      r.lastTouch && r.lastTouch !== "2000-01-01"
+        ? Math.max(1, Math.floor((Date.now() - new Date(r.lastTouch + "Z").getTime()) / 86400000))
+        : null,
+  }));
 }
 
 export function markResearched(id: number) {
@@ -638,36 +795,36 @@ export function suggestedActions(limit = 12): FocusItem[] {
 // the seller is. Registry lives in lib/intel.ts (tiers + talk tracks).
 export function accountIntelFor(companyId: number): AccountIntel[] {
   const db = getDb();
-  const texts: string[] = [];
+  const texts: { text: string; sourceUrl: string | null }[] = [];
   const row = db
     .prepare("SELECT signals, description FROM companies WHERE id = ?")
     .get(companyId) as { signals: string; description: string | null } | undefined;
   try {
-    for (const s of JSON.parse(row?.signals || "[]") as { text: string }[]) {
-      texts.push(s.text);
+    for (const s of JSON.parse(row?.signals || "[]") as { text: string; url?: string }[]) {
+      texts.push({ text: s.text, sourceUrl: s.url ?? null });
     }
   } catch {
     /* malformed signals JSON — skip */
   }
-  if (row?.description) texts.push(row.description);
+  if (row?.description) texts.push({ text: row.description, sourceUrl: null });
   for (const r of db
     .prepare(
-      `SELECT rc.text FROM research_claims rc
+      `SELECT rc.text, rc.sourceUrl FROM research_claims rc
        JOIN research_briefs rb ON rb.id = rc.briefId
        WHERE rb.companyId = ?`
     )
-    .all(companyId) as { text: string }[]) {
-    texts.push(r.text);
+    .all(companyId) as { text: string; sourceUrl: string | null }[]) {
+    texts.push(r);
   }
 
   const out: AccountIntel[] = [];
   for (const t of RIVALS) {
-    const seen = new Set<string>();
+    const seen = new Map<string, { text: string; sourceUrl: string | null }>();
     for (const x of texts) {
-      if (t.re.test(x)) seen.add(x);
+      if (t.re.test(x.text) && !seen.has(x.text)) seen.set(x.text, x);
     }
     if (seen.size) {
-      out.push({ tool: t.tool, url: t.url, tier: t.tier, angle: t.angle, evidence: [...seen].slice(0, 3) });
+      out.push({ tool: t.tool, url: t.url, tier: t.tier, angle: t.angle, evidence: [...seen.values()].slice(0, 3) });
     }
   }
   return out;

@@ -58,6 +58,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [restoring, setRestoring] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [patchError, setPatchError] = useState<string | null>(null);
+  const [touchOpen, setTouchOpen] = useState(false);
+  const [touchDone, setTouchDone] = useState(false);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -109,6 +111,32 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [companyId, onClose]);
 
+// Relative timestamps for the activity timeline — "2h ago" reads faster
+// than a full datetime (absolute value stays on hover). Replaces the old
+// `e.ts + "Z"` parse, which produced a non-ISO string some browsers
+// treated as local time instead of UTC.
+function relTime(ts: string) {
+  const d = new Date(ts.replace(" ", "T") + "Z");
+  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+  // One-click touch log — calls and meetings happen off-cadence; recording
+  // them as note events keeps last-touch, the cooling radar, and the digest
+  // honest without making the seller type a note.
+  async function logTouch(kind: string) {
+    setTouchOpen(false);
+    await patch({ note: `Touch logged — ${kind}` });
+    setTouchDone(true);
+    setTimeout(() => setTouchDone(false), 2000);
+  }
+
   async function patch(body: Record<string, unknown>) {
     if (!company) return;
     setPatchError(null);
@@ -131,8 +159,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setIntel(d.intel ?? []);
   }
 
-  function draftOutreach() {
-    if (!company) return;
+  function outreachVars() {
+    if (!company) return null;
     const champion = contacts.find((c) => c.champion) ?? contacts[0];
     const firstName = champion ? champion.name.split(" ")[0] : "there";
     const exec = execs.find((e) => /cto|chief techn|engineering/i.test(e.role)) ?? execs[0];
@@ -151,23 +179,96 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     const warmLine = warm
       ? `P.S. — I saw ${company.name} already runs ${warm.tool}. It's part of Cognition now; happy to connect you with that team and expand from there.`
       : null;
+    return { firstName, exec, hook, who, est, estEng, diffLine, warmLine };
+  }
+
+  function draftOutreach() {
+    if (!company) return;
+    const v = outreachVars();
+    if (!v) return;
     const text = [
       `Subject: ${company.name} — more eng output without more headcount`,
       ``,
-      `Hi ${firstName},`,
+      `Hi ${v.firstName},`,
       ``,
-      `${hook} — which is why I thought of ${company.name}. ${who} is exactly who we built Devin for: an autonomous software engineer that takes scoped tickets end-to-end (PRs, migrations, test fixes) so senior engineers stay on roadmap work.`,
+      `${v.hook} — which is why I thought of ${company.name}. ${v.who} is exactly who we built Devin for: an autonomous software engineer that takes scoped tickets end-to-end (PRs, migrations, test fixes) so senior engineers stay on roadmap work.`,
       ``,
-      ...(diffLine ? [diffLine, ``] : []),
-      `Back of the envelope for ~${estEng.toLocaleString()} engineers: roughly ${est} a year in shipped-work capacity back. Happy to walk through the math.`,
+      ...(v.diffLine ? [v.diffLine, ``] : []),
+      `Back of the envelope for ~${v.estEng.toLocaleString()} engineers: roughly ${v.est} a year in shipped-work capacity back. Happy to walk through the math.`,
       ``,
       `NYC customers like Goldman Sachs run it on real backlog today. Every claim I send cites a source — happy to share the enterprise playbook.`,
       ``,
       `20 minutes this week?`,
       ``,
       `Zachary`,
-      ...(warmLine ? [``, warmLine] : []),
+      ...(v.warmLine ? [``, v.warmLine] : []),
     ].join("\n");
+    setOutreach(text);
+  }
+
+  // Per-touch drafts — the same personalization as the first email, tuned to
+  // each cadence step's job (connect / brief / ROI nudge / break-up).
+  function draftTouch(stepIndex: number) {
+    if (!company || !sequence) return;
+    const v = outreachVars();
+    if (!v) return;
+    const s = sequence.steps[stepIndex];
+    if (!s) return;
+    let text: string;
+    switch (s.day) {
+      case 0:
+        draftOutreach();
+        return;
+      case 3:
+        text = [
+          `LinkedIn note (≤300 chars):`,
+          ``,
+          `Hi ${v.firstName} — saw ${company.name} is pushing on engineering. I work with NYC eng orgs on Devin (Cognition's autonomous software engineer — closes scoped tickets end-to-end). Goldman runs it here. Worth 15 min?`,
+        ].join("\n");
+        break;
+      case 7:
+        text = [
+          `Subject: Re: ${company.name} — pulled your research brief together`,
+          ``,
+          `Hi ${v.firstName},`,
+          ``,
+          `Following up on my note — I put together a one-page brief on ${company.name}: what you're building, why now, and where Devin fits. ${briefs[0]?.whyNow ? `The short version: ${briefs[0].whyNow}` : `Happy to send it over.`}`,
+          ``,
+          ...(v.diffLine ? [v.diffLine, ``] : []),
+          `Want me to send the brief? It's all sourced — you can verify every claim yourself.`,
+          ``,
+          `Zachary`,
+          ...(v.warmLine ? [``, v.warmLine] : []),
+        ].join("\n");
+        break;
+      case 12:
+        text = [
+          `Subject: ${company.name} — the math on eng capacity`,
+          ``,
+          `Hi ${v.firstName},`,
+          ``,
+          `Ran the back-of-envelope for ${company.name}: ~${v.estEng.toLocaleString()} engineers, and if each gets even a few hours a week back from scoped tickets (test fixes, migrations, small features), that's roughly ${v.est} a year in shipped-work capacity — before counting the roadmap work they stay on.`,
+          ``,
+          `${v.who} — I'd love to pressure-test that math with you. 20 minutes?`,
+          ``,
+          `Zachary`,
+          ...(v.warmLine ? [``, v.warmLine] : []),
+        ].join("\n");
+        break;
+      default:
+        text = [
+          `Subject: Closing the loop, ${company.name}`,
+          ``,
+          `Hi ${v.firstName},`,
+          ``,
+          `I've sent a few notes — I'll assume timing isn't right and stop here. If autonomous eng capacity lands on the roadmap this year, Devin's your call: scoped tickets to merged PRs, running today at Goldman and other NYC enterprises.`,
+          ``,
+          `Door's open anytime.`,
+          ``,
+          `Zachary`,
+          ...(v.warmLine ? [``, v.warmLine] : []),
+        ].join("\n");
+    }
     setOutreach(text);
   }
 
@@ -437,6 +538,28 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
             <div className="flex items-center gap-3">
               <StatusPill status={company.status} />
               <FitScore score={company.fitScore} />
+              <div className="relative">
+                <button
+                  onClick={() => setTouchOpen((v) => !v)}
+                  className="interactive rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-400/20"
+                  title="Log a call, email, or meeting — updates last-touch across every surface"
+                >
+                  {touchDone ? "Logged ✓" : "✓ Touch"}
+                </button>
+                {touchOpen && (
+                  <div className="absolute right-0 top-full z-30 mt-1 w-32 rounded-xl border border-white/10 bg-[#0b0f14] p-1 shadow-2xl">
+                    {["call", "email", "meeting", "LinkedIn"].map((k) => (
+                      <button
+                        key={k}
+                        onClick={() => logTouch(k)}
+                        className="block w-full rounded-lg px-2.5 py-1.5 text-left text-xs capitalize text-gray-300 hover:bg-white/5 hover:text-white"
+                      >
+                        {k}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button
                 onClick={copyOutreachBrief}
                 className="interactive ml-auto rounded-lg border border-white/10 px-2.5 py-1 text-xs text-gray-400 hover:border-accent/40 hover:text-white"
@@ -589,7 +712,17 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                       <ul className="mt-1.5 space-y-1">
                         {t.evidence.map((e, i) => (
                           <li key={i} className="text-xs leading-relaxed text-gray-500">
-                            {e}
+                            {e.text}
+                            {e.sourceUrl && (
+                              <a
+                                href={e.sourceUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="ml-1.5 text-sky-400/70 hover:text-sky-300"
+                              >
+                                source ↗
+                              </a>
+                            )}
                           </li>
                         ))}
                       </ul>
@@ -646,6 +779,15 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                               {s.label}
                             </span>
                           </label>
+                          {!s.done && (
+                            <button
+                              onClick={() => draftTouch(i)}
+                              title="Draft this touch's message"
+                              className="interactive -mt-0.5 mb-1 ml-10 rounded px-1.5 text-[11px] text-accent-soft/70 hover:text-accent-soft"
+                            >
+                              ✉ draft this touch
+                            </button>
+                          )}
                         </li>
                       );
                     })}
@@ -914,8 +1056,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="leading-snug text-gray-300">{e.text}</p>
-                      <p className="text-[11px] text-gray-600">
-                        {new Date(e.ts + "Z").toLocaleString()}
+                      <p className="text-[11px] text-gray-600" title={e.ts + " UTC"}>
+                        {relTime(e.ts)}
                       </p>
                     </div>
                     {e.type === "note" && (

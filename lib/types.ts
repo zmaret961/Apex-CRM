@@ -37,6 +37,7 @@ export interface Company {
   signals: Signal[];
   discovered: number; // 0 = in accounts, 1 = discovered-not-yet-imported
   stageChangedAt?: string | null; // ts of last pipeline move (from company_events)
+  lastTouchAt?: string | null;    // ts of last seller touch (note or pipeline event)
   hasChampion?: number; // sqlite EXISTS() → 0/1: a starred contact exists on this account
   sequenceProgress?: { done: number; total: number }; // parsed from active sequence steps
 }
@@ -107,18 +108,41 @@ export interface SequenceDue {
   overdue: number; // days past its scheduled day; 0 = due today
 }
 
+
 export interface AccountIntel {
   tool: string;
   url: string;
   tier: "cognition" | "competitor"; // Windsurf = Cognition product (warm path)
   angle: string;                  // talk track for this specific rival
-  evidence: string[];             // deduped signal/claim texts where it was mentioned
+  evidence: { text: string; sourceUrl: string | null }[]; // deduped signal/claim texts + their source
 }
 
 export interface NoChampionDeal {
   companyId: number;
   name: string;
   pipelineStage: PipelineStage;
+}
+
+export interface NeverEngagedAccount {
+  companyId: number;
+  name: string;
+  heat: number;
+}
+
+export interface CoolingDeal {
+  companyId: number;
+  name: string;
+  pipelineStage: PipelineStage;
+  daysSinceTouch: number | null; // null = never touched
+}
+
+export interface UpcomingTouch {
+  companyId: number;
+  name: string;
+  stepIndex: number;
+  day: number;
+  label: string;
+  dueInDays: number; // days until this touch lands (1 = tomorrow)
 }
 
 export interface Contact {
@@ -132,12 +156,24 @@ export interface Contact {
   createdAt: string;
 }
 
+// A contact joined to its account for the People page.
+export interface PersonRow extends Contact {
+  companyName: string;
+  pipelineStage: PipelineStage | null;
+  lastTouchAt: string | null;
+}
+
 export interface CompanyEvent {
   id: number;
   companyId: number;
   ts: string;
   type: "pipeline" | "research" | "note" | "status" | "import";
   text: string;
+}
+
+// A company_event joined to its account for the book-wide Activity feed.
+export interface TimelineEvent extends CompanyEvent {
+  companyName: string;
 }
 
 export type FocusActionType = "research" | "advance" | "re-research";

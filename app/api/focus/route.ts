@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import {
+  coolingDeals,
   intelSummary,
+  neverEngagedHot,
   noChampionDeals,
   noSequenceDeals,
   pipelineCounts,
   sequencesDue,
   suggestedActions,
+  upcomingTouches,
   weeklyDigest,
 } from "@/lib/queries";
 
@@ -20,5 +23,8 @@ export function GET() {
     sequenceDue: sequencesDue(),
     noChampion: noChampionDeals(),
     noSequence: noSequenceDeals(),
+    neverEngaged: neverEngagedHot(),
+    cooling: coolingDeals(),
+    upcoming: upcomingTouches(),
   });
 }
