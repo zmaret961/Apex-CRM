@@ -27,6 +27,9 @@ export default function HotLeads() {
   const [selected, setSelected] = useState<number | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [touchMenu, setTouchMenu] = useState<number | null>(null);
+  const [touchBusy, setTouchBusy] = useState<number | null>(null);
+  const [logged, setLogged] = useState<number | null>(null);
 
   async function load() {
     const data = await fetch("/api/companies").then((r) => r.json());
@@ -63,6 +66,29 @@ export default function HotLeads() {
       await load();
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function logTouch(c: Company, kind: string) {
+    setTouchMenu(null);
+    setTouchBusy(c.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/companies/${c.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: `Touch logged — ${kind}` }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error ?? `Couldn't log a touch on ${c.name}.`);
+        return;
+      }
+      setLogged(c.id);
+      setTimeout(() => setLogged((v) => (v === c.id ? null : v)), 2000);
+      await load();
+    } finally {
+      setTouchBusy(null);
     }
   }
 
@@ -193,6 +219,31 @@ export default function HotLeads() {
                     >
                       {busy === c.id ? "Starting…" : "▶ cadence"}
                     </button>
+                  )}
+                  {c.status !== "competitor" && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setTouchMenu((v) => (v === c.id ? null : c.id))}
+                        disabled={touchBusy === c.id}
+                        className="interactive rounded-lg bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-400/20 disabled:opacity-50"
+                        title="Log a call, email, or meeting — updates last-touch across every surface"
+                      >
+                        {logged === c.id ? "Logged ✓" : "✓ Touch"}
+                      </button>
+                      {touchMenu === c.id && (
+                        <div className="absolute left-0 top-full z-30 mt-1 w-28 rounded-xl border border-white/10 bg-[#0b0f14] p-1 shadow-2xl">
+                          {["call", "email", "meeting", "LinkedIn"].map((k) => (
+                            <button
+                              key={k}
+                              onClick={() => logTouch(c, k)}
+                              className="block w-full rounded-lg px-2.5 py-1.5 text-left text-xs capitalize text-gray-300 hover:bg-white/5 hover:text-white"
+                            >
+                              {k}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
