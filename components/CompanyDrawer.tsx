@@ -60,6 +60,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [patchError, setPatchError] = useState<string | null>(null);
   const [touchOpen, setTouchOpen] = useState(false);
   const [touchDone, setTouchDone] = useState(false);
+  const [deletedContact, setDeletedContact] = useState<Contact | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -70,6 +71,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setAdded(false);
     setRemovedStage(null);
     setAdvancedFrom(null);
+    setDeletedContact(null);
     setSequence(null);
     setNotFound(false);
     setPatchError(null);
@@ -304,14 +306,38 @@ function relTime(ts: string) {
     setSavingContact(false);
   }
 
+  // Contacts delete instantly — keep the record for 6s so a misclick on
+  // the × isn't a re-keying exercise. Same forgiving-undo pattern as
+  // pipeline remove/advance.
   async function removeContact(id: number) {
     if (!company) return;
+    const victim = contacts.find((c) => c.id === id);
+    if (!victim) return;
     await fetch(`/api/companies/${company.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deleteContact: id }),
     });
     setContacts((cs) => cs.filter((c) => c.id !== id));
+    setDeletedContact(victim);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoTimer.current = setTimeout(() => setDeletedContact(null), 6000);
+  }
+
+  async function undoRemoveContact() {
+    if (!company || !deletedContact) return;
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    const c = deletedContact;
+    setDeletedContact(null);
+    await fetch(`/api/companies/${company.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contact: { name: c.name, role: c.role, url: c.url, champion: !!c.champion },
+      }),
+    });
+    const d = await fetch(`/api/companies/${company.id}`).then((r) => r.json());
+    setContacts(d.contacts ?? []);
   }
 
   async function toggleChampion(c: Contact) {
@@ -947,6 +973,19 @@ function relTime(ts: string) {
                   <p className="text-sm text-gray-600">
                     No people tracked — add the champion you&apos;re selling through.
                   </p>
+                )}
+                {deletedContact && (
+                  <div className="flex items-center justify-between rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-1.5 text-xs">
+                    <span className="text-gray-400">
+                      Removed <span className="text-gray-300">{deletedContact.name}</span>
+                    </span>
+                    <button
+                      onClick={undoRemoveContact}
+                      className="interactive rounded px-1.5 py-0.5 font-medium text-amber-300 hover:bg-amber-400/15"
+                    >
+                      undo
+                    </button>
+                  </div>
                 )}
                 {contacts.map((c) => (
                   <div key={c.id} className="group flex items-start gap-2 text-sm">
