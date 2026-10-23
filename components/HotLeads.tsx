@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import type { Company } from "@/lib/types";
-import { heat } from "@/lib/heat";
+import { heat, heatBreakdown } from "@/lib/heat";
 import CompanyDrawer from "./CompanyDrawer";
 import FitScore from "./FitScore";
 import StatusPill from "./StatusPill";
@@ -111,8 +111,11 @@ export default function HotLeads() {
                     <span className="block truncate">{c.name}</span>
                     <span className="block truncate text-xs font-normal text-gray-500">{c.domain}</span>
                   </button>
-                  <span className={clsx("shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium", t.cls)}>
-                    {t.label}
+                  <span
+                    className={clsx("shrink-0 cursor-default rounded-full border px-2 py-0.5 text-[11px] font-medium", t.cls)}
+                    title={heatBreakdown(c)}
+                  >
+                    {t.label} · {h}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center gap-2 text-xs text-gray-400">
