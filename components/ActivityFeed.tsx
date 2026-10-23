@@ -26,6 +26,37 @@ function relTime(ts: string) {
   return new Date(ts.replace(" ", "T") + "Z").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+// Day-group the stream — "Today / Yesterday / Wed Oct 15" headers let a
+// seller scan the week the way every real activity feed does.
+function dayKey(ts: string) {
+  return new Date(ts.replace(" ", "T") + "Z").toISOString().slice(0, 10);
+}
+
+function dayLabel(key: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  if (key === today) return "Today";
+  if (key === yesterday) return "Yesterday";
+  return new Date(key + "T00:00:00Z").toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function exportCsv(rows: TimelineEvent[]) {
+  const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
+  const csv = [
+    "ts_utc,type,company,text",
+    ...rows.map((e) => [e.ts, e.type, esc(e.companyName), esc(e.text)].join(",")),
+  ].join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = "apex-activity.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 export default function ActivityFeed() {
   const [events, setEvents] = useState<TimelineEvent[] | null>(null);
   const [filter, setFilter] = useState<TimelineEvent["type"] | "all">("all");
@@ -73,6 +104,13 @@ export default function ActivityFeed() {
           className="interactive ml-auto w-52 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-white placeholder:text-gray-600 focus:border-accent/50 focus:outline-none"
         />
         <span className="text-[11px] text-gray-500">{rows.length} events</span>
+        <button
+          onClick={() => exportCsv(rows)}
+          title="Download the filtered feed as CSV"
+          className="interactive rounded-lg border border-white/15 px-2.5 py-1 text-[11px] text-gray-300"
+        >
+          Export CSV
+        </button>
       </div>
 
       {rows.length === 0 ? (
@@ -80,35 +118,53 @@ export default function ActivityFeed() {
           Nothing here yet — touches, stage moves, and research runs land in this feed.
         </div>
       ) : (
-        <div className="glass divide-y divide-white/5 rounded-2xl">
-          {rows.map((e) => {
-            const meta = TYPE_META[e.type];
-            return (
-              <div key={e.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                <span
-                  className={clsx(
-                    "w-16 shrink-0 rounded-full border px-2 py-0.5 text-center text-[10px] font-medium",
-                    meta.tone
-                  )}
-                >
-                  {meta.label}
-                </span>
-                <button
-                  onClick={() => setSelected(e.companyId)}
-                  className="w-40 shrink-0 truncate text-left font-medium text-white hover:text-accent-soft"
-                >
-                  {e.companyName}
-                </button>
-                <span className="min-w-0 flex-1 truncate text-gray-400">{e.text}</span>
-                <span
-                  className="w-20 shrink-0 text-right text-[11px] text-gray-600"
-                  title={e.ts + " UTC"}
-                >
-                  {relTime(e.ts)}
-                </span>
+        <div className="space-y-4">
+          {(() => {
+            const groups: { key: string; items: TimelineEvent[] }[] = [];
+            for (const e of rows) {
+              const k = dayKey(e.ts);
+              const g = groups[groups.length - 1];
+              if (g && g.key === k) g.items.push(e);
+              else groups.push({ key: k, items: [e] });
+            }
+            return groups.map((g) => (
+              <div key={g.key}>
+                <div className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600">
+                  {dayLabel(g.key)}
+                </div>
+                <div className="glass divide-y divide-white/5 rounded-2xl">
+                  {g.items.map((e) => {
+                    const meta = TYPE_META[e.type];
+                    return (
+                      <div key={e.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                        <span
+                          className={clsx(
+                            "w-16 shrink-0 rounded-full border px-2 py-0.5 text-center text-[10px] font-medium",
+                            meta.tone
+                          )}
+                        >
+                          {meta.label}
+                        </span>
+                        <button
+                          onClick={() => setSelected(e.companyId)}
+                          className="w-40 shrink-0 truncate text-left font-medium text-white hover:text-accent-soft"
+                        >
+                          {e.companyName}
+                        </button>
+                        <span className="min-w-0 flex-1 truncate text-gray-400">{e.text}</span>
+                        <span
+                          className="w-20 shrink-0 text-right text-[11px] text-gray-600"
+                          title={e.ts + " UTC"}
+                        >
+                          {relTime(e.ts)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            );
-          })}
+            ));
+          })()}
         </div>
       )}
 
