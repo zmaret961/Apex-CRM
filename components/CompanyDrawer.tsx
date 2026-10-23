@@ -62,6 +62,8 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [touchDone, setTouchDone] = useState(false);
   const [deletedContact, setDeletedContact] = useState<Contact | null>(null);
   const [editingNote, setEditingNote] = useState<{ id: number; text: string } | null>(null);
+  const [recipientId, setRecipientId] = useState<number | null>(null);
+  const lastDraft = useRef<(() => void) | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -74,6 +76,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setAdvancedFrom(null);
     setDeletedContact(null);
     setEditingNote(null);
+    setRecipientId(null);
     setSequence(null);
     setNotFound(false);
     setPatchError(null);
@@ -104,6 +107,12 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
       })
       .catch(() => setSuggestion(null));
   }, [companyId]);
+
+  // Re-aim an open draft when the seller picks a different recipient.
+  useEffect(() => {
+    if (outreach !== null) lastDraft.current?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recipientId]);
 
   // Esc closes the drawer.
   useEffect(() => {
@@ -165,7 +174,10 @@ function relTime(ts: string) {
 
   function outreachVars() {
     if (!company) return null;
-    const champion = contacts.find((c) => c.champion) ?? contacts[0];
+    const champion =
+      contacts.find((c) => c.id === recipientId) ??
+      contacts.find((c) => c.champion) ??
+      contacts[0];
     const firstName = champion ? champion.name.split(" ")[0] : "there";
     const exec = execs.find((e) => /cto|chief techn|engineering/i.test(e.role)) ?? execs[0];
     const hook =
@@ -188,6 +200,7 @@ function relTime(ts: string) {
 
   function draftOutreach() {
     if (!company) return;
+    lastDraft.current = draftOutreach;
     const v = outreachVars();
     if (!v) return;
     const text = [
@@ -214,6 +227,7 @@ function relTime(ts: string) {
   // each cadence step's job (connect / brief / ROI nudge / break-up).
   function draftTouch(stepIndex: number) {
     if (!company || !sequence) return;
+    lastDraft.current = () => draftTouch(stepIndex);
     const v = outreachVars();
     if (!v) return;
     const s = sequence.steps[stepIndex];
@@ -620,6 +634,29 @@ function relTime(ts: string) {
             </div>
             {outreach !== null && (
               <div className="-mt-2 animate-fade-up rounded-xl border border-accent/25 bg-accent/8 p-3.5">
+                {contacts.length > 1 && (
+                  <div className="mb-2 flex items-center gap-2 text-[11px] text-gray-500">
+                    <span>To:</span>
+                    <select
+                      value={recipientId ?? ""}
+                      onChange={(e) =>
+                        setRecipientId(e.target.value ? Number(e.target.value) : null)
+                      }
+                      title="Who the draft addresses — switching regenerates it"
+                      className="interactive rounded-lg border border-white/10 bg-transparent px-2 py-0.5 text-[11px] text-gray-300 [&>option]:bg-base-900"
+                    >
+                      <option value="">
+                        Auto — {contacts.find((c) => c.champion)?.name ?? contacts[0].name}
+                      </option>
+                      {contacts.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                          {c.champion ? " ★" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <textarea
                   value={outreach}
                   onChange={(e) => setOutreach(e.target.value)}
