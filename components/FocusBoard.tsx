@@ -655,7 +655,7 @@ export default function FocusBoard() {
                 </div>
                 {t.accounts.length > 0 && (
                   <p className="mt-1 truncate text-[11px] text-gray-600">
-                    {t.accounts.slice(0, 4).join(", ")}
+                    {t.accounts.slice(0, 4).map((a) => a.name).join(", ")}
                     {t.accounts.length > 4 && ` +${t.accounts.length - 4} more`}
                   </p>
                 )}

@@ -67,12 +67,14 @@ export default function BattlecardsPage() {
               {t.accounts.length > 0 && (
                 <div className="mt-2.5 flex flex-wrap gap-1.5">
                   {t.accounts.slice(0, 12).map((a) => (
-                    <span
-                      key={a}
-                      className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-gray-400"
+                    <a
+                      key={a.id}
+                      href={`/accounts?open=${a.id}`}
+                      title={`Open ${a.name}`}
+                      className="interactive rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-gray-400 hover:border-accent/40 hover:text-white"
                     >
-                      {a}
-                    </span>
+                      {a.name}
+                    </a>
                   ))}
                   {t.accounts.length > 12 && (
                     <span className="px-1.5 py-0.5 text-[11px] text-gray-600">

@@ -858,35 +858,35 @@ export function intelSummary(): IntelSummary {
   const db = getDb();
   const claims = db
     .prepare(
-      `SELECT rc.text, c.name as companyName FROM research_claims rc
+      `SELECT rc.text, c.name as companyName, c.id as companyId FROM research_claims rc
        JOIN research_briefs rb ON rb.id = rc.briefId
        JOIN companies c ON c.id = rb.companyId
        WHERE rc.category IN ('Competitor mention','AI tooling','Devin mention')`
     )
-    .all() as { text: string; companyName: string }[];
+    .all() as { text: string; companyName: string; companyId: number }[];
 
   const signalRows = db
-    .prepare("SELECT name, signals FROM companies WHERE discovered = 0")
-    .all() as { name: string; signals: string }[];
+    .prepare("SELECT id, name, signals FROM companies WHERE discovered = 0")
+    .all() as { id: number; name: string; signals: string }[];
 
-  const map = new Map<string, { tool: string; url: string; mentions: number; accounts: Set<string> }>();
-  for (const t of RIVALS) map.set(t.tool, { ...t, mentions: 0, accounts: new Set() });
+  const map = new Map<string, { tool: string; url: string; mentions: number; accounts: Map<number, string> }>();
+  for (const t of RIVALS) map.set(t.tool, { ...t, mentions: 0, accounts: new Map() });
 
-  const scan = (text: string, company: string) => {
+  const scan = (text: string, companyId: number, company: string) => {
     for (const t of RIVALS) {
       if (t.re.test(text)) {
         const e = map.get(t.tool)!;
         e.mentions++;
-        e.accounts.add(company);
+        e.accounts.set(companyId, company);
       }
       t.re.lastIndex = 0;
     }
   };
 
-  for (const c of claims) scan(c.text, c.companyName);
+  for (const c of claims) scan(c.text, c.companyId, c.companyName);
   for (const r of signalRows) {
     try {
-      for (const s of JSON.parse(r.signals || "[]") as { text: string }[]) scan(s.text, r.name);
+      for (const s of JSON.parse(r.signals || "[]") as { text: string }[]) scan(s.text, r.id, r.name);
     } catch {
       /* malformed signals JSON — skip */
     }
@@ -901,7 +901,9 @@ export function intelSummary(): IntelSummary {
         tier: (rival?.tier ?? "competitor") as "cognition" | "competitor",
         angle: rival?.angle ?? "",
         mentions: t.mentions,
-        accounts: [...t.accounts].sort(),
+        accounts: [...t.accounts]
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
       };
     })
     .sort((a, b) => b.mentions - a.mentions);
