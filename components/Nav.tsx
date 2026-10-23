@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
@@ -20,6 +21,25 @@ const LINKS = [
 
 export default function Nav() {
   const path = usePathname();
+  // Overdue/due cadence touches follow you on every page — the badge keeps
+  // today's work visible without a trip to Focus.
+  const [due, setDue] = useState(0);
+  useEffect(() => {
+    let stop = false;
+    const load = () =>
+      fetch("/api/focus")
+        .then((r) => r.json())
+        .then((d) => {
+          if (!stop) setDue(d.sequenceDue?.length ?? 0);
+        })
+        .catch(() => {});
+    load();
+    const t = setInterval(load, 60_000);
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+  }, [path]);
   return (
     <header className="fixed inset-x-0 top-0 z-40 flex items-center justify-between px-6 py-3 print:hidden">
       <div className="glass pointer-events-auto flex items-center gap-3 rounded-2xl px-4 py-2">
@@ -49,6 +69,14 @@ export default function Nav() {
             >
               <span className="mr-1.5 opacity-70">{l.icon}</span>
               {l.label}
+              {l.href === "/focus" && due > 0 && (
+                <span
+                  title={`${due} cadence touch${due === 1 ? "" : "es"} due or overdue`}
+                  className="ml-1.5 rounded-full bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300"
+                >
+                  {due}
+                </span>
+              )}
             </Link>
           );
         })}
