@@ -17,6 +17,7 @@ import {
   setContactChampion,
   setSequenceStep,
   startSequence,
+  updateNote,
   updatePipeline,
   setStatus,
   setEstimatedValue,
@@ -85,6 +86,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const eventId = Number(body.deleteNote);
     if (!Number.isInteger(eventId) || eventId <= 0) return bad("deleteNote must be an event id");
   }
+  if ("editNote" in body) {
+    const e = body.editNote;
+    if (!e || typeof e !== "object" || !Number.isInteger(Number(e.id)) || Number(e.id) <= 0) {
+      return bad("editNote.id must be an event id");
+    }
+    if (typeof e.text !== "string" || !e.text.trim()) {
+      return bad("editNote.text must be a non-empty string");
+    }
+    if (e.text.trim().length > 2000) return bad("editNote.text too long");
+  }
   if ("contact" in body) {
     const c = body.contact;
     if (!c || typeof c !== "object" || typeof c.name !== "string" || !c.name.trim()) {
@@ -131,6 +142,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if ("note" in body) addEvent(companyId, "note", body.note.trim());
   if ("deleteNote" in body) deleteNote(companyId, Number(body.deleteNote));
+  if ("editNote" in body) {
+    const e = body.editNote;
+    if (!updateNote(companyId, Number(e.id), e.text.trim())) {
+      return NextResponse.json({ error: "note not found on this company" }, { status: 404 });
+    }
+  }
   if ("contact" in body) {
     const c = body.contact;
     const clip = (v: unknown, max: number) =>

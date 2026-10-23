@@ -61,6 +61,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [touchOpen, setTouchOpen] = useState(false);
   const [touchDone, setTouchDone] = useState(false);
   const [deletedContact, setDeletedContact] = useState<Contact | null>(null);
+  const [editingNote, setEditingNote] = useState<{ id: number; text: string } | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -72,6 +73,7 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setRemovedStage(null);
     setAdvancedFrom(null);
     setDeletedContact(null);
+    setEditingNote(null);
     setSequence(null);
     setNotFound(false);
     setPatchError(null);
@@ -441,7 +443,22 @@ function relTime(ts: string) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deleteNote: eventId }),
     });
+    setEditingNote((en) => (en?.id === eventId ? null : en));
     setEvents((es) => es.filter((e) => e.id !== eventId));
+  }
+
+  async function saveEditNote() {
+    if (!company || !editingNote) return;
+    const text = editingNote.text.trim();
+    if (!text) return;
+    const r = await fetch(`/api/companies/${company.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ editNote: { id: editingNote.id, text } }),
+    });
+    if (!r.ok) return;
+    setEvents((es) => es.map((e) => (e.id === editingNote.id ? { ...e, text } : e)));
+    setEditingNote(null);
   }
 
   async function copyOutreachBrief() {
@@ -1094,19 +1111,62 @@ function relTime(ts: string) {
                       {EVENT_LABEL[e.type]}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="leading-snug text-gray-300">{e.text}</p>
-                      <p className="text-[11px] text-gray-600" title={e.ts + " UTC"}>
-                        {relTime(e.ts)}
-                      </p>
+                      {editingNote?.id === e.id ? (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            autoFocus
+                            value={editingNote.text}
+                            onChange={(ev) =>
+                              setEditingNote((en) => (en ? { ...en, text: ev.target.value } : en))
+                            }
+                            onKeyDown={(ev) => {
+                              if (ev.key === "Escape") ev.stopPropagation(); // keep the drawer open
+                              if (ev.key === "Enter") saveEditNote();
+                              if (ev.key === "Escape") setEditingNote(null);
+                            }}
+                            maxLength={2000}
+                            className="interactive flex-1 rounded border border-accent/40 bg-transparent px-2 py-0.5 text-sm outline-none"
+                          />
+                          <button
+                            onClick={saveEditNote}
+                            disabled={!editingNote.text.trim()}
+                            className="interactive rounded px-1.5 py-0.5 text-xs text-accent-soft disabled:opacity-40"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingNote(null)}
+                            className="interactive rounded px-1 py-0.5 text-xs text-gray-600"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="leading-snug text-gray-300">{e.text}</p>
+                          <p className="text-[11px] text-gray-600" title={e.ts + " UTC"}>
+                            {relTime(e.ts)}
+                          </p>
+                        </>
+                      )}
                     </div>
-                    {e.type === "note" && (
-                      <button
-                        onClick={() => deleteNote(e.id)}
-                        title="Delete note"
-                        className="interactive -my-1 shrink-0 self-start rounded px-1.5 py-0.5 text-xs text-gray-600 opacity-0 transition-opacity hover:text-rose-300 group-hover:opacity-100"
-                      >
-                        ×
-                      </button>
+                    {e.type === "note" && editingNote?.id !== e.id && (
+                      <span className="-my-1 flex shrink-0 self-start">
+                        <button
+                          onClick={() => setEditingNote({ id: e.id, text: e.text })}
+                          title="Edit note"
+                          className="interactive rounded px-1.5 py-0.5 text-xs text-gray-600 opacity-0 transition-opacity hover:text-accent-soft group-hover:opacity-100"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          onClick={() => deleteNote(e.id)}
+                          title="Delete note"
+                          className="interactive rounded px-1.5 py-0.5 text-xs text-gray-600 opacity-0 transition-opacity hover:text-rose-300 group-hover:opacity-100"
+                        >
+                          ×
+                        </button>
+                      </span>
                     )}
                   </div>
                 ))}

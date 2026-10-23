@@ -192,6 +192,14 @@ export function deleteNote(companyId: number, eventId: number): boolean {
   return r.changes > 0;
 }
 
+export function updateNote(companyId: number, eventId: number, text: string): boolean {
+  const db = getDb();
+  const r = db
+    .prepare("UPDATE company_events SET text = ? WHERE id = ? AND companyId = ? AND type = 'note'")
+    .run(text, eventId, companyId);
+  return r.changes > 0;
+}
+
 // Book-wide event feed — everything the system and the seller logged,
 // newest first. Powers the Activity page.
 export function listEvents(limit = 300): TimelineEvent[] {
