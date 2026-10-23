@@ -108,6 +108,12 @@ export default function MapView() {
           status: c.status,
           fitScore: c.fitScore,
           color: STATUS_COLOR[c.status] ?? "#6b7280",
+          openDeal:
+            c.pipelineStage != null &&
+            c.pipelineStage !== "Closed Won" &&
+            c.pipelineStage !== "Closed Lost"
+              ? 1
+              : 0,
         },
       })),
     }),
@@ -167,6 +173,23 @@ export default function MapView() {
               "circle-color": ["get", "color"],
               "circle-opacity": 0.30,
               "circle-blur": 1,
+            }}
+          />
+          {/* open deals get an accent ring — the pipeline reads spatially */}
+          <Layer
+            id="deal-rings"
+            type="circle"
+            filter={["==", ["get", "openDeal"], 1]}
+            paint={{
+              "circle-radius": [
+                "interpolate", ["linear"], ["zoom"],
+                10, 7,
+                13, 11,
+              ],
+              "circle-color": "rgba(0,0,0,0)",
+              "circle-stroke-width": 1.6,
+              "circle-stroke-color": "#a78bfa",
+              "circle-stroke-opacity": 0.85,
             }}
           />
           {/* every company, always — no clustering */}
@@ -299,6 +322,7 @@ export default function MapView() {
         <Legend color="#60a5fa" label="High-fit prospect" />
         <Legend color="#6b7280" label="Researched / low-fit" />
         <Legend color="#fb7185" label="Competitor (intel only)" />
+        <Legend color="#a78bfa" label="Open pipeline deal" ring />
       </div>
 
       <CompanyDrawer
@@ -317,12 +341,12 @@ export default function MapView() {
   );
 }
 
-function Legend({ color, label }: { color: string; label: string }) {
+function Legend({ color, label, ring }: { color: string; label: string; ring?: boolean }) {
   return (
     <div className="flex items-center gap-2 text-gray-300">
       <span
         className="h-2.5 w-2.5 rounded-full"
-        style={{ background: color, boxShadow: `0 0 10px ${color}` }}
+        style={ring ? { border: `2px solid ${color}` } : { background: color, boxShadow: `0 0 10px ${color}` }}
       />
       {label}
     </div>

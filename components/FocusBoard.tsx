@@ -194,7 +194,32 @@ export default function FocusBoard() {
     (i) => !done.has(i.companyId) && !snoozed.has(i.companyId)
   );
   const completed = (data?.items ?? []).filter((i) => done.has(i.companyId));
-  const snoozedItems = (data?.items ?? []).filter((i) => snoozed.has(i.companyId));
+
+  // The radar blocks get the same 7-day snooze as suggestions — a
+  // deliberately-deprioritized account shouldn't flag forever. Filtered
+  // views drive the block headers; snoozed entries land in the tray below
+  // labelled by which radar they came from.
+  const visNoChampion = (data?.noChampion ?? []).filter((d) => !snoozed.has(d.companyId));
+  const visNeverEngaged = (data?.neverEngaged ?? []).filter((d) => !snoozed.has(d.companyId));
+  const visCooling = (data?.cooling ?? []).filter((d) => !snoozed.has(d.companyId));
+  const visNoSequence = (data?.noSequence ?? []).filter((d) => !snoozed.has(d.companyId));
+  const snoozeTray = [
+    ...(data?.items ?? []).filter((i) => snoozed.has(i.companyId)).map((i) => ({ companyId: i.companyId, name: i.name, kind: "suggestion" })),
+    ...(data?.noChampion ?? []).filter((d) => snoozed.has(d.companyId)).map((d) => ({ companyId: d.companyId, name: d.name, kind: "no champion" })),
+    ...(data?.neverEngaged ?? []).filter((d) => snoozed.has(d.companyId)).map((d) => ({ companyId: d.companyId, name: d.name, kind: "never engaged" })),
+    ...(data?.cooling ?? []).filter((d) => snoozed.has(d.companyId)).map((d) => ({ companyId: d.companyId, name: d.name, kind: "cooling deal" })),
+    ...(data?.noSequence ?? []).filter((d) => snoozed.has(d.companyId)).map((d) => ({ companyId: d.companyId, name: d.name, kind: "no cadence" })),
+  ];
+
+  const snoozeBtn = (id: number) => (
+    <button
+      onClick={() => snooze(id)}
+      title={`Hide for ${SNOOZE_DAYS} days`}
+      className="shrink-0 text-[10px] text-gray-600 hover:text-gray-400"
+    >
+      snooze
+    </button>
+  );
 
   async function doneTouch(item: SequenceDue) {
     setBusy(item.companyId);
@@ -375,13 +400,13 @@ export default function FocusBoard() {
             </div>
           </div>
         )}
-        {(data?.noChampion ?? []).length > 0 && (
+        {visNoChampion.length > 0 && (
           <div className="glass rounded-2xl p-4">
             <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-              Deals with no champion · {data!.noChampion.length}
+              Deals with no champion · {visNoChampion.length}
             </div>
             <div className="space-y-1">
-              {data!.noChampion.map((d) => (
+              {visNoChampion.map((d) => (
                 <div
                   key={`nchamp-${d.companyId}`}
                   className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm"
@@ -399,18 +424,19 @@ export default function FocusBoard() {
                   >
                     no champion
                   </span>
+                  {snoozeBtn(d.companyId)}
                 </div>
               ))}
             </div>
           </div>
         )}
-        {(data?.neverEngaged ?? []).length > 0 && (
+        {visNeverEngaged.length > 0 && (
           <div className="glass rounded-2xl p-4">
             <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-              🔥 Hot, never engaged · {data!.neverEngaged.length}
+              🔥 Hot, never engaged · {visNeverEngaged.length}
             </div>
             <div className="space-y-1">
-              {data!.neverEngaged.map((d) => (
+              {visNeverEngaged.map((d) => (
                 <div
                   key={`ne-${d.companyId}`}
                   className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm"
@@ -431,18 +457,19 @@ export default function FocusBoard() {
                   >
                     {busy === d.companyId ? "…" : "start cadence"}
                   </button>
+                  {snoozeBtn(d.companyId)}
                 </div>
               ))}
             </div>
           </div>
         )}
-        {(data?.cooling ?? []).length > 0 && (
+        {visCooling.length > 0 && (
           <div className="glass rounded-2xl p-4">
             <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-              🧊 Deals going cold · {data!.cooling.length}
+              🧊 Deals going cold · {visCooling.length}
             </div>
             <div className="space-y-1">
-              {data!.cooling.map((d) => (
+              {visCooling.map((d) => (
                 <div
                   key={`cool-${d.companyId}`}
                   className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm"
@@ -465,18 +492,19 @@ export default function FocusBoard() {
                   >
                     {busy === d.companyId ? "…" : "start cadence"}
                   </button>
+                  {snoozeBtn(d.companyId)}
                 </div>
               ))}
             </div>
           </div>
         )}
-        {(data?.noSequence ?? []).length > 0 && (
+        {visNoSequence.length > 0 && (
           <div className="glass rounded-2xl p-4">
             <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
-              Deals without a cadence · {data!.noSequence.length}
+              Deals without a cadence · {visNoSequence.length}
             </div>
             <div className="space-y-1">
-              {data!.noSequence.map((d) => (
+              {visNoSequence.map((d) => (
                 <div
                   key={`noseq-${d.companyId}`}
                   className="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm"
@@ -496,6 +524,7 @@ export default function FocusBoard() {
                   >
                     {busy === d.companyId ? "…" : "start cadence"}
                   </button>
+                  {snoozeBtn(d.companyId)}
                 </div>
               ))}
             </div>
@@ -561,17 +590,20 @@ export default function FocusBoard() {
             <span className="shrink-0 text-xs text-emerald-300">done</span>
           </div>
         ))}
-        {snoozedItems.length > 0 && (
+        {snoozeTray.length > 0 && (
           <div className="glass rounded-2xl p-3">
             <div className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600">
-              Snoozed · {snoozedItems.length}
+              Snoozed · {snoozeTray.length}
             </div>
-            {snoozedItems.map((item) => (
+            {snoozeTray.map((item) => (
               <div
-                key={`snoozed-${item.companyId}`}
+                key={`snoozed-${item.companyId}-${item.kind}`}
                 className="flex items-center justify-between rounded-lg px-2 py-1 text-xs"
               >
-                <span className="truncate text-gray-500">{item.name}</span>
+                <span className="truncate text-gray-500">
+                  {item.name}
+                  <span className="ml-2 text-[10px] text-gray-700">{item.kind}</span>
+                </span>
                 <button
                   onClick={() => unsnooze(item.companyId)}
                   className="interactive ml-2 rounded px-1.5 py-0.5 text-[10px] text-accent-soft hover:bg-accent/10"
@@ -623,7 +655,7 @@ export default function FocusBoard() {
                 </div>
                 {t.accounts.length > 0 && (
                   <p className="mt-1 truncate text-[11px] text-gray-600">
-                    {t.accounts.slice(0, 4).join(", ")}
+                    {t.accounts.slice(0, 4).map((a) => a.name).join(", ")}
                     {t.accounts.length > 4 && ` +${t.accounts.length - 4} more`}
                   </p>
                 )}

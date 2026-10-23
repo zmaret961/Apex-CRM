@@ -40,6 +40,7 @@ export interface Company {
   lastTouchAt?: string | null;    // ts of last seller touch (note or pipeline event)
   hasChampion?: number; // sqlite EXISTS() → 0/1: a starred contact exists on this account
   sequenceProgress?: { done: number; total: number }; // parsed from active sequence steps
+  nextTouchIn?: number; // days until the next undone cadence touch lands; <=0 means due now/overdue
 }
 
 export interface Claim {
@@ -156,11 +157,16 @@ export interface Contact {
   createdAt: string;
 }
 
-// A contact joined to its account for the People page.
+// A person joined to their account for the People page — your saved
+// contacts plus sourced execs from the org charts, unified. `saved` is
+// true once the person is in your contacts (id > 0 is the contact id;
+// unsaved execs carry id = -execId so keys stay unique).
 export interface PersonRow extends Contact {
   companyName: string;
   pipelineStage: PipelineStage | null;
   lastTouchAt: string | null;
+  saved: boolean;
+  execId: number | null;
 }
 
 export interface CompanyEvent {
@@ -197,7 +203,7 @@ export interface IntelTool {
   tier: "cognition" | "competitor"; // Windsurf = Cognition product (warm path)
   angle: string;                  // talk track for this rival
   mentions: number;
-  accounts: string[];
+  accounts: { id: number; name: string }[];
 }
 
 export interface IntelSummary {

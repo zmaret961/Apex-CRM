@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import type { Company } from "@/lib/types";
-import { heat } from "@/lib/heat";
+import { heat, heatBreakdown } from "@/lib/heat";
 import CompanyDrawer from "./CompanyDrawer";
 import FitScore from "./FitScore";
 import StatusPill from "./StatusPill";
@@ -27,6 +27,9 @@ export default function HotLeads() {
   const [selected, setSelected] = useState<number | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [touchMenu, setTouchMenu] = useState<number | null>(null);
+  const [touchBusy, setTouchBusy] = useState<number | null>(null);
+  const [logged, setLogged] = useState<number | null>(null);
 
   async function load() {
     const data = await fetch("/api/companies").then((r) => r.json());
@@ -45,6 +48,49 @@ export default function HotLeads() {
       .sort((a, b) => b.h - a.h)
       .slice(0, 30);
   }, [companies]);
+
+  async function startCadence(c: Company) {
+    setBusy(c.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/companies/${c.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startSequence: true }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error ?? `Couldn't start a cadence on ${c.name}.`);
+        return;
+      }
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function logTouch(c: Company, kind: string) {
+    setTouchMenu(null);
+    setTouchBusy(c.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/companies/${c.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: `Touch logged — ${kind}` }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j.error ?? `Couldn't log a touch on ${c.name}.`);
+        return;
+      }
+      setLogged(c.id);
+      setTimeout(() => setLogged((v) => (v === c.id ? null : v)), 2000);
+      await load();
+    } finally {
+      setTouchBusy(null);
+    }
+  }
 
   async function addToPipeline(c: Company) {
     setBusy(c.id);
@@ -91,8 +137,11 @@ export default function HotLeads() {
                     <span className="block truncate">{c.name}</span>
                     <span className="block truncate text-xs font-normal text-gray-500">{c.domain}</span>
                   </button>
-                  <span className={clsx("shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium", t.cls)}>
-                    {t.label}
+                  <span
+                    className={clsx("shrink-0 cursor-default rounded-full border px-2 py-0.5 text-[11px] font-medium", t.cls)}
+                    title={heatBreakdown(c)}
+                  >
+                    {t.label} · {h}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center gap-2 text-xs text-gray-400">
@@ -103,6 +152,46 @@ export default function HotLeads() {
                       {c.pipelineStage}
                     </span>
                   )}
+                  {c.sequenceProgress && (
+                    <span
+                      className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent-soft"
+                      title="Outreach cadence progress"
+                    >
+                      {c.sequenceProgress.done}/{c.sequenceProgress.total} touches
+                    </span>
+                  )}
+                  {c.nextTouchIn !== undefined && (
+                    <span
+                      className={clsx(
+                        "text-[11px]",
+                        c.nextTouchIn < 0
+                          ? "font-medium text-amber-300/80"
+                          : c.nextTouchIn === 0
+                            ? "font-medium text-emerald-300/80"
+                            : "text-gray-600"
+                      )}
+                      title="Next cadence touch"
+                    >
+                      {c.nextTouchIn < 0
+                        ? `${-c.nextTouchIn}d overdue`
+                        : c.nextTouchIn === 0
+                          ? "touch due"
+                          : `next in ${c.nextTouchIn}d`}
+                    </span>
+                  )}
+                  {(() => {
+                    if (!c.lastTouchAt)
+                      return <span className="text-[11px] text-amber-300/70">never touched</span>;
+                    const d = Math.max(
+                      0,
+                      Math.floor((Date.now() - new Date(c.lastTouchAt.replace(" ", "T") + "Z").getTime()) / 86400000)
+                    );
+                    return (
+                      <span className={clsx("text-[11px]", d > 14 ? "text-amber-300/70" : "text-gray-600")}>
+                        touched {d === 0 ? "today" : d === 1 ? "yesterday" : `${d}d ago`}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-gray-400">{whyHot(c)}</p>
                 <div className="mt-3 flex items-center gap-2">
@@ -120,6 +209,41 @@ export default function HotLeads() {
                     >
                       {busy === c.id ? "Adding…" : "+ Pipeline"}
                     </button>
+                  )}
+                  {!c.sequenceProgress && c.status !== "competitor" && c.status !== "customer" && (
+                    <button
+                      onClick={() => startCadence(c)}
+                      disabled={busy === c.id}
+                      className="interactive rounded-lg bg-violet-400/10 px-2.5 py-1 text-xs font-medium text-violet-300 hover:bg-violet-400/20 disabled:opacity-50"
+                      title="Start the 5-touch outreach sequence"
+                    >
+                      {busy === c.id ? "Starting…" : "▶ cadence"}
+                    </button>
+                  )}
+                  {c.status !== "competitor" && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setTouchMenu((v) => (v === c.id ? null : c.id))}
+                        disabled={touchBusy === c.id}
+                        className="interactive rounded-lg bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-400/20 disabled:opacity-50"
+                        title="Log a call, email, or meeting — updates last-touch across every surface"
+                      >
+                        {logged === c.id ? "Logged ✓" : "✓ Touch"}
+                      </button>
+                      {touchMenu === c.id && (
+                        <div className="absolute left-0 top-full z-30 mt-1 w-28 rounded-xl border border-white/10 bg-[#0b0f14] p-1 shadow-2xl">
+                          {["call", "email", "meeting", "LinkedIn"].map((k) => (
+                            <button
+                              key={k}
+                              onClick={() => logTouch(c, k)}
+                              className="block w-full rounded-lg px-2.5 py-1.5 text-left text-xs capitalize text-gray-300 hover:bg-white/5 hover:text-white"
+                            >
+                              {k}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

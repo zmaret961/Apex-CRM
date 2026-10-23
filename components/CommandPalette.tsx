@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Company, SearchHit } from "@/lib/types";
+import type { Company, PersonRow, SearchHit } from "@/lib/types";
 import StatusPill from "./StatusPill";
 
 interface Action {
   id: string;
-  kind: "nav" | "action" | "company" | "research";
+  kind: "nav" | "action" | "company" | "research" | "contact";
   label: string;
   hint?: string;
   kindLabel?: string;
@@ -62,6 +62,7 @@ export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [people, setPeople] = useState<PersonRow[]>([]);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -92,7 +93,12 @@ export default function CommandPalette() {
     if (companies.length === 0) {
       fetch("/api/companies").then((r) => r.json()).then(setCompanies);
     }
-  }, [open, companies.length]);
+    if (people.length === 0) {
+      fetch("/api/contacts").then((r) => r.json()).then((d) => {
+        if (Array.isArray(d)) setPeople(d);
+      }).catch(() => {});
+    }
+  }, [open, companies.length, people.length]);
 
   // Research search — debounced server lookup over claims + briefs.
   useEffect(() => {
@@ -163,6 +169,24 @@ export default function CommandPalette() {
           run: () => router.push(`/?focus=${c.id}`),
         });
       }
+      // Contacts match too — "who was that at Goldman?" shouldn't need a
+      // trip to People. Up to 3, ahead of research hits.
+      for (const p of people) {
+        if (matched.length > 10) break;
+        if (
+          p.name.toLowerCase().includes(needle) ||
+          p.role.toLowerCase().includes(needle)
+        ) {
+          matched.push({
+            id: `ct-${p.id}`,
+            kind: "contact",
+            label: p.name,
+            hint: `${p.role || "contact"} · ${p.companyName}${p.champion ? " · ★" : ""}`,
+            kindLabel: "contact",
+            run: () => router.push(`/people?q=${encodeURIComponent(p.name)}`),
+          });
+        }
+      }
       // Research hits on accounts not already listed as company matches.
       const shown = new Set(companyHits.map((c) => c.id));
       for (const h of hits) {
@@ -181,7 +205,7 @@ export default function CommandPalette() {
       return [...matched, ...list];
     }
     return list;
-  }, [q, companies, hits, router]);
+  }, [q, companies, people, hits, router]);
 
   useEffect(() => setCursor(0), [q]);
 
@@ -257,7 +281,7 @@ export default function CommandPalette() {
               >
                 <span className="flex min-w-0 items-center gap-2.5">
                   <span className="w-4 shrink-0 text-center text-xs text-gray-500">
-                    {a.kind === "company" ? "▸" : a.kind === "action" ? "⚡" : a.kind === "research" ? "◆" : "↪"}
+                    {a.kind === "company" ? "▸" : a.kind === "action" ? "⚡" : a.kind === "research" ? "◆" : a.kind === "contact" ? "◍" : "↪"}
                   </span>
                   <span className="truncate">{a.label}</span>
                   {a.kindLabel && (

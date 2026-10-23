@@ -87,7 +87,8 @@ export function listCompanies(opts: {
            WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouchAt,
          EXISTS(SELECT 1 FROM contacts ct
            WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion,
-         (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps
+         (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps,
+         (SELECT s.startedAt FROM sequences s WHERE s.companyId = c.id) AS sequenceStartedAt
        FROM companies c WHERE ${where.join(" AND ")} ORDER BY c.fitScore DESC`
     )
     .all(...args) as RawCompany[];
@@ -105,7 +106,8 @@ export function getCompany(id: number): Company | null {
            WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouchAt,
          EXISTS(SELECT 1 FROM contacts ct
            WHERE ct.companyId = c.id AND ct.champion = 1) AS hasChampion,
-         (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps
+         (SELECT s.steps FROM sequences s WHERE s.companyId = c.id) AS sequenceSteps,
+         (SELECT s.startedAt FROM sequences s WHERE s.companyId = c.id) AS sequenceStartedAt
        FROM companies c WHERE c.id = ?`
     )
     .get(id) as RawCompany | undefined;
@@ -190,6 +192,14 @@ export function deleteNote(companyId: number, eventId: number): boolean {
   return r.changes > 0;
 }
 
+export function updateNote(companyId: number, eventId: number, text: string): boolean {
+  const db = getDb();
+  const r = db
+    .prepare("UPDATE company_events SET text = ? WHERE id = ? AND companyId = ? AND type = 'note'")
+    .run(text, eventId, companyId);
+  return r.changes > 0;
+}
+
 // Book-wide event feed — everything the system and the seller logged,
 // newest first. Powers the Activity page.
 export function listEvents(limit = 300): TimelineEvent[] {
@@ -218,21 +228,41 @@ export function execsFor(companyId: number): Exec[] {
     .all(companyId) as Exec[];
 }
 
-// Every saved contact joined to its account — the People page. Champions
-// first, then grouped by account. lastTouchAt is the same seller-touch
-// definition used by the account cards and the cooling radar.
+// The People directory: every sourced org-chart exec UNION every saved
+// contact that isn't an exec row. An exec already in contacts keeps its
+// contact row (champion, url, notes); an unsaved exec gets a synthetic
+// negative id so list keys stay unique and the UI can offer "save".
 export function listContacts(): PersonRow[] {
   const db = getDb();
   return db
     .prepare(
-      `SELECT ct.*, c.name AS companyName, c.pipelineStage,
-         (SELECT MAX(ce.ts) FROM company_events ce
-           WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouchAt
-       FROM contacts ct JOIN companies c ON c.id = ct.companyId
-       WHERE c.discovered = 0
-       ORDER BY ct.champion DESC, c.name ASC, ct.id ASC`
+      `SELECT * FROM (
+         SELECT COALESCE(ct.id, -e.id) AS id, c.id AS companyId,
+           e.name, e.role, COALESCE(ct.url, '') AS url,
+           COALESCE(ct.notes, '') AS notes, COALESCE(ct.champion, 0) AS champion,
+           COALESCE(ct.createdAt, '') AS createdAt,
+           c.name AS companyName, c.pipelineStage,
+           (SELECT MAX(ce.ts) FROM company_events ce
+             WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')) AS lastTouchAt,
+           (ct.id IS NOT NULL) AS saved, e.id AS execId
+         FROM execs e JOIN companies c ON c.id = e.companyId
+         LEFT JOIN contacts ct ON ct.companyId = e.companyId AND ct.name = e.name
+         WHERE c.discovered = 0
+         UNION ALL
+         SELECT ct.id, c.id, ct.name, ct.role, ct.url, ct.notes, ct.champion,
+           ct.createdAt, c.name, c.pipelineStage,
+           (SELECT MAX(ce.ts) FROM company_events ce
+             WHERE ce.companyId = c.id AND ce.type IN ('note', 'pipeline')),
+           1, NULL
+         FROM contacts ct JOIN companies c ON c.id = ct.companyId
+         WHERE c.discovered = 0
+           AND NOT EXISTS (SELECT 1 FROM execs e
+             WHERE e.companyId = ct.companyId AND e.name = ct.name)
+       )
+       ORDER BY champion DESC, saved DESC, companyName ASC, name ASC`
     )
-    .all() as PersonRow[];
+    .all()
+    .map((r) => ({ ...(r as PersonRow), saved: !!(r as PersonRow).saved }));
 }
 
 export function contactsFor(companyId: number): Contact[] {
@@ -533,7 +563,7 @@ export function coolingDeals(limit = 8): CoolingDeal[] {
     pipelineStage: r.pipelineStage,
     daysSinceTouch:
       r.lastTouch && r.lastTouch !== "2000-01-01"
-        ? Math.max(1, Math.floor((Date.now() - new Date(r.lastTouch + "Z").getTime()) / 86400000))
+        ? Math.max(1, Math.floor((Date.now() - new Date(r.lastTouch.replace(" ", "T") + "Z").getTime()) / 86400000))
         : null,
   }));
 }
@@ -766,7 +796,7 @@ export function suggestedActions(limit = 12): FocusItem[] {
       action: "re-research",
       label: "Re-engage (stuck deal)",
       reason: c.stageChangedAt
-        ? `${Math.max(1, Math.floor((Date.now() - new Date(c.stageChangedAt + "Z").getTime()) / 86400000))}d in ${c.pipelineStage} with no stage movement — a fresh signal gives you a reason to re-open the thread.`
+        ? `${Math.max(1, Math.floor((Date.now() - new Date(c.stageChangedAt.replace(" ", "T") + "Z").getTime()) / 86400000))}d in ${c.pipelineStage} with no stage movement — a fresh signal gives you a reason to re-open the thread.`
         : `In ${c.pipelineStage} with no recorded stage movement — a fresh signal gives you a reason to re-open the thread.`,
     });
   }
@@ -836,35 +866,35 @@ export function intelSummary(): IntelSummary {
   const db = getDb();
   const claims = db
     .prepare(
-      `SELECT rc.text, c.name as companyName FROM research_claims rc
+      `SELECT rc.text, c.name as companyName, c.id as companyId FROM research_claims rc
        JOIN research_briefs rb ON rb.id = rc.briefId
        JOIN companies c ON c.id = rb.companyId
        WHERE rc.category IN ('Competitor mention','AI tooling','Devin mention')`
     )
-    .all() as { text: string; companyName: string }[];
+    .all() as { text: string; companyName: string; companyId: number }[];
 
   const signalRows = db
-    .prepare("SELECT name, signals FROM companies WHERE discovered = 0")
-    .all() as { name: string; signals: string }[];
+    .prepare("SELECT id, name, signals FROM companies WHERE discovered = 0")
+    .all() as { id: number; name: string; signals: string }[];
 
-  const map = new Map<string, { tool: string; url: string; mentions: number; accounts: Set<string> }>();
-  for (const t of RIVALS) map.set(t.tool, { ...t, mentions: 0, accounts: new Set() });
+  const map = new Map<string, { tool: string; url: string; mentions: number; accounts: Map<number, string> }>();
+  for (const t of RIVALS) map.set(t.tool, { ...t, mentions: 0, accounts: new Map() });
 
-  const scan = (text: string, company: string) => {
+  const scan = (text: string, companyId: number, company: string) => {
     for (const t of RIVALS) {
       if (t.re.test(text)) {
         const e = map.get(t.tool)!;
         e.mentions++;
-        e.accounts.add(company);
+        e.accounts.set(companyId, company);
       }
       t.re.lastIndex = 0;
     }
   };
 
-  for (const c of claims) scan(c.text, c.companyName);
+  for (const c of claims) scan(c.text, c.companyId, c.companyName);
   for (const r of signalRows) {
     try {
-      for (const s of JSON.parse(r.signals || "[]") as { text: string }[]) scan(s.text, r.name);
+      for (const s of JSON.parse(r.signals || "[]") as { text: string }[]) scan(s.text, r.id, r.name);
     } catch {
       /* malformed signals JSON — skip */
     }
@@ -879,7 +909,9 @@ export function intelSummary(): IntelSummary {
         tier: (rival?.tier ?? "competitor") as "cognition" | "competitor",
         angle: rival?.angle ?? "",
         mentions: t.mentions,
-        accounts: [...t.accounts].sort(),
+        accounts: [...t.accounts]
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
       };
     })
     .sort((a, b) => b.mentions - a.mentions);
@@ -896,14 +928,23 @@ interface RawCompany extends Omit<Company, "sources" | "signals"> {
 }
 
 function hydrate(row: RawCompany): Company {
-  const { sequenceSteps, ...rest } = row as RawCompany & {
+  const { sequenceSteps, sequenceStartedAt, ...rest } = row as RawCompany & {
     sequenceSteps?: string | null;
+    sequenceStartedAt?: string | null;
   };
   let sequenceProgress: { done: number; total: number } | undefined;
+  let nextTouchIn: number | undefined;
   if (sequenceSteps) {
     try {
-      const steps = JSON.parse(sequenceSteps) as { done: boolean }[];
+      const steps = JSON.parse(sequenceSteps) as { day: number; done: boolean }[];
       sequenceProgress = { done: steps.filter((s) => s.done).length, total: steps.length };
+      const next = steps.find((s) => !s.done);
+      if (next && sequenceStartedAt) {
+        const elapsed = Math.floor(
+          (Date.now() - new Date(sequenceStartedAt.replace(" ", "T") + "Z").getTime()) / 86400000
+        );
+        nextTouchIn = next.day - elapsed;
+      }
     } catch {
       /* malformed steps JSON — skip */
     }
@@ -927,6 +968,7 @@ function hydrate(row: RawCompany): Company {
     sources,
     signals,
     ...(sequenceProgress ? { sequenceProgress } : {}),
+    ...(nextTouchIn !== undefined ? { nextTouchIn } : {}),
   };
 }
 

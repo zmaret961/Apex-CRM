@@ -60,6 +60,10 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
   const [patchError, setPatchError] = useState<string | null>(null);
   const [touchOpen, setTouchOpen] = useState(false);
   const [touchDone, setTouchDone] = useState(false);
+  const [deletedContact, setDeletedContact] = useState<Contact | null>(null);
+  const [editingNote, setEditingNote] = useState<{ id: number; text: string } | null>(null);
+  const [recipientId, setRecipientId] = useState<number | null>(null);
+  const lastDraft = useRef<(() => void) | null>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -70,6 +74,9 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
     setAdded(false);
     setRemovedStage(null);
     setAdvancedFrom(null);
+    setDeletedContact(null);
+    setEditingNote(null);
+    setRecipientId(null);
     setSequence(null);
     setNotFound(false);
     setPatchError(null);
@@ -100,6 +107,12 @@ export default function CompanyDrawer({ companyId, onClose, onAdded }: Props) {
       })
       .catch(() => setSuggestion(null));
   }, [companyId]);
+
+  // Re-aim an open draft when the seller picks a different recipient.
+  useEffect(() => {
+    if (outreach !== null) lastDraft.current?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recipientId]);
 
   // Esc closes the drawer.
   useEffect(() => {
@@ -161,7 +174,10 @@ function relTime(ts: string) {
 
   function outreachVars() {
     if (!company) return null;
-    const champion = contacts.find((c) => c.champion) ?? contacts[0];
+    const champion =
+      contacts.find((c) => c.id === recipientId) ??
+      contacts.find((c) => c.champion) ??
+      contacts[0];
     const firstName = champion ? champion.name.split(" ")[0] : "there";
     const exec = execs.find((e) => /cto|chief techn|engineering/i.test(e.role)) ?? execs[0];
     const hook =
@@ -184,6 +200,7 @@ function relTime(ts: string) {
 
   function draftOutreach() {
     if (!company) return;
+    lastDraft.current = draftOutreach;
     const v = outreachVars();
     if (!v) return;
     const text = [
@@ -210,6 +227,7 @@ function relTime(ts: string) {
   // each cadence step's job (connect / brief / ROI nudge / break-up).
   function draftTouch(stepIndex: number) {
     if (!company || !sequence) return;
+    lastDraft.current = () => draftTouch(stepIndex);
     const v = outreachVars();
     if (!v) return;
     const s = sequence.steps[stepIndex];
@@ -304,14 +322,38 @@ function relTime(ts: string) {
     setSavingContact(false);
   }
 
+  // Contacts delete instantly — keep the record for 6s so a misclick on
+  // the × isn't a re-keying exercise. Same forgiving-undo pattern as
+  // pipeline remove/advance.
   async function removeContact(id: number) {
     if (!company) return;
+    const victim = contacts.find((c) => c.id === id);
+    if (!victim) return;
     await fetch(`/api/companies/${company.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deleteContact: id }),
     });
     setContacts((cs) => cs.filter((c) => c.id !== id));
+    setDeletedContact(victim);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoTimer.current = setTimeout(() => setDeletedContact(null), 6000);
+  }
+
+  async function undoRemoveContact() {
+    if (!company || !deletedContact) return;
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    const c = deletedContact;
+    setDeletedContact(null);
+    await fetch(`/api/companies/${company.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contact: { name: c.name, role: c.role, url: c.url, champion: !!c.champion },
+      }),
+    });
+    const d = await fetch(`/api/companies/${company.id}`).then((r) => r.json());
+    setContacts(d.contacts ?? []);
   }
 
   async function toggleChampion(c: Contact) {
@@ -415,7 +457,22 @@ function relTime(ts: string) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deleteNote: eventId }),
     });
+    setEditingNote((en) => (en?.id === eventId ? null : en));
     setEvents((es) => es.filter((e) => e.id !== eventId));
+  }
+
+  async function saveEditNote() {
+    if (!company || !editingNote) return;
+    const text = editingNote.text.trim();
+    if (!text) return;
+    const r = await fetch(`/api/companies/${company.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ editNote: { id: editingNote.id, text } }),
+    });
+    if (!r.ok) return;
+    setEvents((es) => es.map((e) => (e.id === editingNote.id ? { ...e, text } : e)));
+    setEditingNote(null);
   }
 
   async function copyOutreachBrief() {
@@ -577,6 +634,29 @@ function relTime(ts: string) {
             </div>
             {outreach !== null && (
               <div className="-mt-2 animate-fade-up rounded-xl border border-accent/25 bg-accent/8 p-3.5">
+                {contacts.length > 1 && (
+                  <div className="mb-2 flex items-center gap-2 text-[11px] text-gray-500">
+                    <span>To:</span>
+                    <select
+                      value={recipientId ?? ""}
+                      onChange={(e) =>
+                        setRecipientId(e.target.value ? Number(e.target.value) : null)
+                      }
+                      title="Who the draft addresses — switching regenerates it"
+                      className="interactive rounded-lg border border-white/10 bg-transparent px-2 py-0.5 text-[11px] text-gray-300 [&>option]:bg-base-900"
+                    >
+                      <option value="">
+                        Auto — {contacts.find((c) => c.champion)?.name ?? contacts[0].name}
+                      </option>
+                      {contacts.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                          {c.champion ? " ★" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <textarea
                   value={outreach}
                   onChange={(e) => setOutreach(e.target.value)}
@@ -948,6 +1028,19 @@ function relTime(ts: string) {
                     No people tracked — add the champion you&apos;re selling through.
                   </p>
                 )}
+                {deletedContact && (
+                  <div className="flex items-center justify-between rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-1.5 text-xs">
+                    <span className="text-gray-400">
+                      Removed <span className="text-gray-300">{deletedContact.name}</span>
+                    </span>
+                    <button
+                      onClick={undoRemoveContact}
+                      className="interactive rounded px-1.5 py-0.5 font-medium text-amber-300 hover:bg-amber-400/15"
+                    >
+                      undo
+                    </button>
+                  </div>
+                )}
                 {contacts.map((c) => (
                   <div key={c.id} className="group flex items-start gap-2 text-sm">
                     <button
@@ -1055,19 +1148,62 @@ function relTime(ts: string) {
                       {EVENT_LABEL[e.type]}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="leading-snug text-gray-300">{e.text}</p>
-                      <p className="text-[11px] text-gray-600" title={e.ts + " UTC"}>
-                        {relTime(e.ts)}
-                      </p>
+                      {editingNote?.id === e.id ? (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            autoFocus
+                            value={editingNote.text}
+                            onChange={(ev) =>
+                              setEditingNote((en) => (en ? { ...en, text: ev.target.value } : en))
+                            }
+                            onKeyDown={(ev) => {
+                              if (ev.key === "Escape") ev.stopPropagation(); // keep the drawer open
+                              if (ev.key === "Enter") saveEditNote();
+                              if (ev.key === "Escape") setEditingNote(null);
+                            }}
+                            maxLength={2000}
+                            className="interactive flex-1 rounded border border-accent/40 bg-transparent px-2 py-0.5 text-sm outline-none"
+                          />
+                          <button
+                            onClick={saveEditNote}
+                            disabled={!editingNote.text.trim()}
+                            className="interactive rounded px-1.5 py-0.5 text-xs text-accent-soft disabled:opacity-40"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingNote(null)}
+                            className="interactive rounded px-1 py-0.5 text-xs text-gray-600"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="leading-snug text-gray-300">{e.text}</p>
+                          <p className="text-[11px] text-gray-600" title={e.ts + " UTC"}>
+                            {relTime(e.ts)}
+                          </p>
+                        </>
+                      )}
                     </div>
-                    {e.type === "note" && (
-                      <button
-                        onClick={() => deleteNote(e.id)}
-                        title="Delete note"
-                        className="interactive -my-1 shrink-0 self-start rounded px-1.5 py-0.5 text-xs text-gray-600 opacity-0 transition-opacity hover:text-rose-300 group-hover:opacity-100"
-                      >
-                        ×
-                      </button>
+                    {e.type === "note" && editingNote?.id !== e.id && (
+                      <span className="-my-1 flex shrink-0 self-start">
+                        <button
+                          onClick={() => setEditingNote({ id: e.id, text: e.text })}
+                          title="Edit note"
+                          className="interactive rounded px-1.5 py-0.5 text-xs text-gray-600 opacity-0 transition-opacity hover:text-accent-soft group-hover:opacity-100"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          onClick={() => deleteNote(e.id)}
+                          title="Delete note"
+                          className="interactive rounded px-1.5 py-0.5 text-xs text-gray-600 opacity-0 transition-opacity hover:text-rose-300 group-hover:opacity-100"
+                        >
+                          ×
+                        </button>
+                      </span>
                     )}
                   </div>
                 ))}
@@ -1131,7 +1267,7 @@ function relTime(ts: string) {
               {company.pipelineStage != null
                 ? `In pipeline — ${company.pipelineStage}${
                     company.stageChangedAt
-                      ? ` · ${Math.max(0, Math.floor((Date.now() - new Date(company.stageChangedAt + "Z").getTime()) / 86400000))}d`
+                      ? ` · ${Math.max(0, Math.floor((Date.now() - new Date(company.stageChangedAt.replace(" ", "T") + "Z").getTime()) / 86400000))}d`
                       : ""
                   }`
                 : added

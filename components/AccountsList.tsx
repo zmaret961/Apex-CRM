@@ -19,8 +19,11 @@ const FILTERS_KEY = "apex-accounts-filters";
 type SortKey = "heat" | "fit" | "name" | "employees" | "touch";
 const SORT_KEYS: SortKey[] = ["heat", "fit", "name", "employees", "touch"];
 
-function loadFilters(): { q: string; industry: string; status: string; stage: string; sort: SortKey } {
-  const empty = { q: "", industry: "", status: "", stage: "", sort: "heat" as const };
+type TouchKey = "" | "cold" | "never" | "fresh";
+const TOUCH_KEYS: TouchKey[] = ["", "cold", "never", "fresh"];
+
+function loadFilters(): { q: string; industry: string; status: string; stage: string; sort: SortKey; touch: TouchKey } {
+  const empty = { q: "", industry: "", status: "", stage: "", sort: "heat" as const, touch: "" as const };
   try {
     const raw = JSON.parse(localStorage.getItem(FILTERS_KEY) ?? "null");
     if (!raw || typeof raw !== "object") return empty;
@@ -30,10 +33,19 @@ function loadFilters(): { q: string; industry: string; status: string; stage: st
       status: typeof raw.status === "string" ? raw.status : "",
       stage: typeof raw.stage === "string" ? raw.stage : "",
       sort: SORT_KEYS.includes(raw.sort) ? raw.sort : "heat",
+      touch: TOUCH_KEYS.includes(raw.touch) ? raw.touch : "",
     };
   } catch {
     return empty;
   }
+}
+
+function daysSinceTouch(c: Company): number {
+  if (!c.lastTouchAt) return Infinity;
+  return Math.max(
+    0,
+    Math.floor((Date.now() - new Date(c.lastTouchAt.replace(" ", "T") + "Z").getTime()) / 86400000)
+  );
 }
 
 export default function AccountsList() {
@@ -43,6 +55,7 @@ export default function AccountsList() {
   const [industry, setIndustry] = useState("");
   const [status, setStatus] = useState("");
   const [stage, setStage] = useState("");
+  const [touch, setTouch] = useState<TouchKey>("");
   const [sort, setSort] = useState<SortKey>("heat");
   const [selected, setSelected] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
@@ -78,14 +91,15 @@ export default function AccountsList() {
     setIndustry(f.industry);
     setStatus(f.status);
     setStage(f.stage);
+    setTouch(f.touch);
     setSort(f.sort);
   }, []);
 
   useEffect(() => {
     try {
-      localStorage.setItem(FILTERS_KEY, JSON.stringify({ q, industry, status, stage, sort }));
+      localStorage.setItem(FILTERS_KEY, JSON.stringify({ q, industry, status, stage, sort, touch }));
     } catch { /* storage unavailable */ }
-  }, [q, industry, status, stage, sort]);
+  }, [q, industry, status, stage, sort, touch]);
 
   // Deep link: /accounts?open=<id> opens the shared company drawer.
   //            /accounts?add=1 opens the Add company modal (⌘K action).
@@ -132,6 +146,9 @@ export default function AccountsList() {
       fetch(`/api/companies?${p}`)
         .then((r) => r.json())
         .then((list: Company[]) => {
+          if (touch === "never") list = list.filter((c) => !c.lastTouchAt);
+          else if (touch === "cold") list = list.filter((c) => daysSinceTouch(c) > 14);
+          else if (touch === "fresh") list = list.filter((c) => daysSinceTouch(c) <= 7);
           if (sort === "name") list.sort((a, b) => a.name.localeCompare(b.name));
           else if (sort === "employees") list.sort((a, b) => b.employees - a.employees);
           else if (sort === "heat") list.sort((a, b) => heat(b) - heat(a));
@@ -144,13 +161,13 @@ export default function AccountsList() {
         });
     }, 180);
     return () => clearTimeout(t);
-  }, [q, industry, status, stage, sort, refreshKey]);
+  }, [q, industry, status, stage, sort, touch, refreshKey]);
 
   // Filters changed → a stale bulk selection pointing at off-list rows is a
   // footgun; clear it.
   useEffect(() => {
     setChecked(new Set());
-  }, [q, industry, status, stage, sort]);
+  }, [q, industry, status, stage, sort, touch]);
 
   function exportCsv(list: Company[] = companies) {
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
@@ -211,6 +228,35 @@ export default function AccountsList() {
     setRefreshKey((k) => k + 1);
   }
 
+  // startSequence uses INSERT OR REPLACE — it would silently restart any
+  // running cadence, so only accounts without one are eligible.
+  async function bulkCadence() {
+    const eligible = companies.filter(
+      (c) => checked.has(c.id) && !c.sequenceProgress && c.status !== "competitor"
+    );
+    const skipped = checked.size - eligible.length;
+    if (eligible.length === 0) {
+      setBulkNote("Nothing to arm — already cadenced or competitors");
+      return;
+    }
+    setBulkBusy(true);
+    const results = await Promise.all(
+      eligible.map((c) =>
+        fetch(`/api/companies/${c.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ startSequence: true }),
+        }).then((r) => r.ok)
+      )
+    );
+    setBulkBusy(false);
+    setBulkNote(
+      `Cadences started on ${results.filter(Boolean).length}${skipped ? ` · ${skipped} skipped` : ""}`
+    );
+    setChecked(new Set());
+    setRefreshKey((k) => k + 1);
+  }
+
   return (
     <>
       <div className="glass mb-5 flex flex-wrap items-center gap-2 rounded-2xl px-4 py-2.5">
@@ -221,13 +267,14 @@ export default function AccountsList() {
           placeholder="Search companies… ( / )"
           className="interactive w-56 rounded-lg border border-white/10 bg-transparent px-3 py-1.5 text-sm outline-none placeholder:text-gray-600 focus:border-accent/50"
         />
-        {(q || industry || status || stage) && (
+        {(q || industry || status || stage || touch) && (
           <button
             onClick={() => {
               setQ("");
               setIndustry("");
               setStatus("");
               setStage("");
+              setTouch("");
             }}
             title="Clear all filters"
             className="interactive rounded-lg border border-white/10 px-2 py-1.5 text-xs text-gray-500 hover:border-accent/40 hover:text-gray-300"
@@ -266,6 +313,18 @@ export default function AccountsList() {
           <option value="open">In pipeline (open)</option>
           <option value="none">Not in pipeline</option>
           {PIPELINE_STAGES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select
+          value={touch}
+          onChange={(e) => setTouch(e.target.value as TouchKey)}
+          aria-label="Filter by last touch"
+          title="Cold = never touched, or untouched for 14+ days"
+          className="interactive rounded-lg border border-white/10 bg-transparent px-2 py-1.5 text-sm text-gray-300 [&>option]:bg-base-900"
+        >
+          <option value="">Any touch</option>
+          <option value="cold">Cold (never / 14d+)</option>
+          <option value="never">Never touched</option>
+          <option value="fresh">Touched this week</option>
         </select>
         <select
           value={sort}
@@ -367,7 +426,7 @@ export default function AccountsList() {
                   return <span className="text-amber-300/70">never touched</span>;
                 const d = Math.max(
                   0,
-                  Math.floor((Date.now() - new Date(c.lastTouchAt + "Z").getTime()) / 86400000)
+                  Math.floor((Date.now() - new Date(c.lastTouchAt.replace(" ", "T") + "Z").getTime()) / 86400000)
                 );
                 return (
                   <span className={d > 14 ? "text-amber-300/70" : "text-gray-600"}>
@@ -388,6 +447,14 @@ export default function AccountsList() {
             className="interactive rounded-lg border border-accent/40 bg-accent/15 px-2.5 py-1 text-xs font-medium text-accent-soft disabled:opacity-40"
           >
             Add to pipeline
+          </button>
+          <button
+            disabled={bulkBusy}
+            onClick={bulkCadence}
+            title="Start the 5-touch outreach cadence on every selected account that doesn't have one"
+            className="interactive rounded-lg border border-violet-400/40 bg-violet-500/15 px-2.5 py-1 text-xs font-medium text-violet-300 disabled:opacity-40"
+          >
+            ▶ Cadences
           </button>
           <button
             disabled={bulkBusy}
